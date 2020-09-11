@@ -52,12 +52,21 @@ using namespace std;
 
 #include "CommonLib/Slice.h"
 #include "CommonLib/Picture.h"
-
+#if pre_ana
+#include "EncoderLib/RateCtrl.h"
+#endif
 /// YUV file I/O class
 class VideoIOYuv
 {
 private:
+#if pre_ana
+public:
   fstream   m_cHandle;                                      ///< file handle
+private:
+#else
+  fstream   m_cHandle;                                      ///< file handle
+#endif
+  
   int       m_fileBitdepth[MAX_NUM_CHANNEL_TYPE]; ///< bitdepth of input/output video file
   int       m_MSBExtendedBitDepth[MAX_NUM_CHANNEL_TYPE];  ///< bitdepth after addition of MSBs (with value 0)
   int       m_bitdepthShift[MAX_NUM_CHANNEL_TYPE];  ///< number of bits to increase or decrease image by before/after write/read

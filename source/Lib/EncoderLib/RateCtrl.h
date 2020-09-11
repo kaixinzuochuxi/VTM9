@@ -371,6 +371,58 @@ private:
 #endif
 };
 
+
+
+#if pre_ana
+
+class pre_analysis
+{
+public:
+  int m_size;
+  vector<PelBuf*> pre_ana_buf;
+  int curidx;
+
+  pre_analysis() { m_size = 0; curidx = 0; }
+  //~pre_analysis();
+
+  void createbuf(int w,int h)
+  {
+    for (int i = 0; i < m_size; i++)
+    {
+      //pre_ana_buf.push_back( new PelBuf);
+      Pel *tbuf = new Pel [w*h];
+      
+      //PelBuf temp((Pel*)xMalloc(Pel, w*h), w, h);
+      PelBuf temp(tbuf, w, h);
+      pre_ana_buf.push_back(&temp);
+      
+    }
+  }
+
+  void addbuf(int n)
+  {
+    if (n > 0)
+    {
+      for (int i = 0; i < n; i++)
+      {
+        pre_ana_buf.push_back(new PelBuf);
+      }
+    }
+  }
+
+  //void update(int n)
+  //{
+  //  for (int i = 0; i < n; i++)
+  //  {
+  //    pre_ana_buf.push_back(pre_ana_buf.front()); pre_ana_buf.pop_front();
+  //  }
+  //}
+};
+
+
+
+#endif
+
 #endif
 
 

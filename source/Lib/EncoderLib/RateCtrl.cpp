@@ -1951,3 +1951,9 @@ void RateCtrl::destroyRCGOP()
   delete m_encRCGOP;
   m_encRCGOP = NULL;
 }
+
+#if pre_ana
+
+extern pre_analysis pa= pre_analysis();
+
+#endif

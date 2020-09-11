@@ -46,6 +46,9 @@
 #include "EncoderLib/AnnexBwrite.h"
 #include "EncoderLib/EncLibCommon.h"
 
+#if pre_ana
+#include "EncoderLib/RateCtrl.h"
+#endif
 using namespace std;
 
 //! \ingroup EncoderApp
@@ -1032,6 +1035,85 @@ bool EncApp::encodePrep( bool& eos )
   const InputColourSpaceConversion ipCSC = m_inputColourSpaceConvert;
   const InputColourSpaceConversion snrCSC = ( !m_snrInternalColourSpace ) ? m_inputColourSpaceConvert : IPCOLOURSPACE_UNCHANGED;
 
+#if pre_ana 
+  //extern 
+  const int sourceHeight = m_isField ? m_iSourceHeightOrg : m_iSourceHeight;
+  UnitArea unitArea(m_chromaFormatIDC, Area(0, 0, m_iSourceWidth, sourceHeight));
+  PelStorage*            temp_orgPic = new PelStorage;
+  temp_orgPic->create(unitArea);
+  
+  auto cur_pos = m_cVideoIOYuvInputFile.m_cHandle.tellg();
+  //m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
+ 
+  if (m_iGOPSize == 16)
+  {
+    if (m_cEncLib.m_iPOCLast==-1)
+    {
+      
+      int num_pre_ana = m_cEncLib.getIntraPeriod() + 1;
+      if (m_cEncLib.getIntraPeriod() != 16)
+      {
+        num_pre_ana -= 16;
+      }
+      // start of the sequence
+    }
+    else if ((m_cEncLib.m_iPOCLast+1)% m_cEncLib.getIntraPeriod() == 0)
+    {
+      // start of a new ip
+      int num_pre_ana = m_cEncLib.getIntraPeriod();
+    }
+  }
+  else if(m_iGOPSize==8)
+  {
+    if (m_cEncLib.m_iPOCLast == -1)
+    {
+      
+      // start of the sequence
+      int num_pre_ana = 32 + 1;
+    }
+    else if ((m_cEncLib.m_iPOCLast + 1) % m_iGOPSize == 0)
+    {
+      // start of a new GOP
+      int num_pre_ana = 32;
+    }
+  }
+  else if (m_iGOPSize == 1)
+  {
+    int num_pre_ana = 16;
+    if (m_cEncLib.m_iPOCLast == -1)
+    {
+      extern pre_analysis pa;
+
+      pa.m_size = num_pre_ana;
+      //pa.createbuf(m_iSourceWidth, m_iSourceHeight);
+      
+      for (int fidx = 0; fidx < num_pre_ana; fidx++)
+      {
+        int xxx = 0;
+        m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
+        
+        
+
+        Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
+        PelBuf * tmp = new PelBuf;
+        tmp->buf = tbuf;
+        tmp->stride = m_iSourceWidth;
+        tmp->width = m_iSourceWidth;
+        tmp->height = m_iSourceHeight;
+        //tmp((Pel*)xMalloc(Pel, m_iSourceWidth*m_iSourceHeight), m_iSourceWidth, m_iSourceHeight);
+        tmp->copyFrom(m_orgPic->bufs[0]);
+        
+        //pa.pre_ana_buf[fidx]
+        pa.pre_ana_buf.push_back( tmp);
+      }
+      int  xxx = 0;
+    }
+    
+    
+
+  }
+
+#endif
   // read input YUV file
 #if EXTENSION_360_VIDEO
   if( m_ext360->isEnabled() )
@@ -1045,7 +1127,7 @@ bool EncApp::encodePrep( bool& eos )
 #else
   m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
 #endif
-
+  //m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
   if( m_gopBasedTemporalFilterEnabled )
   {
     m_temporalFilter.filter( m_orgPic, m_iFrameRcvd );

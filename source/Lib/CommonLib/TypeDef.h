@@ -50,6 +50,11 @@
 #include <assert.h>
 #include <cassert>
 
+// self define macro
+#define pre_ana 1
+
+
+
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_R0058                                        1 // JVET-R0058: the combination of RPR, subpictures, and scalability 
 

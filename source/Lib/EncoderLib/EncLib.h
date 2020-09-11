@@ -72,7 +72,14 @@ class EncLib : public EncCfg
 {
 private:
   // picture
+#if pre_ana
+public:
   int                       m_iPOCLast;                           ///< time index (POC)
+private:
+#else
+  int                       m_iPOCLast;                           ///< time index (POC)
+#endif
+  
   int                       m_iNumPicRcvd;                        ///< number of received pictures
   uint32_t                  m_uiNumAllPicCoded;                   ///< number of coded pictures
   PicList&                  m_cListPic;                           ///< dynamic list of pictures

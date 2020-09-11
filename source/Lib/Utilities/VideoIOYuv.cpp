@@ -45,7 +45,9 @@
 #include "CommonLib/Rom.h"
 #include "VideoIOYuv.h"
 #include "CommonLib/Unit.h"
-
+#if pre_ana
+#include "EncoderLib/RateCtrl.h"
+#endif
 using namespace std;
 
 #define FLIP_PIC 0
