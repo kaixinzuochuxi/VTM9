@@ -373,55 +373,216 @@ private:
 
 
 
-#if pre_ana
-
-class pre_analysis
-{
-public:
-  int m_size;
-  vector<PelBuf*> pre_ana_buf;
-  int curidx;
-
-  pre_analysis() { m_size = 0; curidx = 0; }
-  //~pre_analysis();
-
-  void createbuf(int w,int h)
-  {
-    for (int i = 0; i < m_size; i++)
-    {
-      //pre_ana_buf.push_back( new PelBuf);
-      Pel *tbuf = new Pel [w*h];
-      
-      //PelBuf temp((Pel*)xMalloc(Pel, w*h), w, h);
-      PelBuf temp(tbuf, w, h);
-      pre_ana_buf.push_back(&temp);
-      
-    }
-  }
-
-  void addbuf(int n)
-  {
-    if (n > 0)
-    {
-      for (int i = 0; i < n; i++)
-      {
-        pre_ana_buf.push_back(new PelBuf);
-      }
-    }
-  }
-
-  //void update(int n)
-  //{
-  //  for (int i = 0; i < n; i++)
-  //  {
-  //    pre_ana_buf.push_back(pre_ana_buf.front()); pre_ana_buf.pop_front();
-  //  }
-  //}
-};
-
-
-
-#endif
+//#if pre_ana
+//
+//
+//class pre_analysis
+//{
+//public:
+//  int m_size;
+//  vector<PelBuf*> pre_ana_buf;
+//  int curidx;
+//  int CTUsize = 64;
+//  int framew;
+//  int frameh;
+//
+//  pre_analysis(int iframew, int iframeh) {
+//    m_size = 0; curidx = 0; framew = iframew; frameh = iframeh;
+//  }
+//  //~pre_analysis();
+//
+//  void createbuf(int w,int h)
+//  {
+//    for (int i = 0; i < m_size; i++)
+//    {
+//      //pre_ana_buf.push_back( new PelBuf);
+//      Pel *tbuf = new Pel [w*h];
+//      
+//      //PelBuf temp((Pel*)xMalloc(Pel, w*h), w, h);
+//      PelBuf temp(tbuf, w, h);
+//      pre_ana_buf.push_back(&temp);
+//      
+//    }
+//  }
+//
+//  void addbuf(int n)
+//  {
+//    if (n > 0)
+//    {
+//      for (int i = 0; i < n; i++)
+//      {
+//        pre_ana_buf.push_back(new PelBuf);
+//      }
+//    }
+//  }
+//
+//  //void update(int n)
+//  //{
+//  //  for (int i = 0; i < n; i++)
+//  //  {
+//  //    pre_ana_buf.push_back(pre_ana_buf.front()); pre_ana_buf.pop_front();
+//  //  }
+//  //}
+//
+//  void destroy()
+//  {
+//    while (pre_ana_buf.size()!=0)
+//    {
+//      delete pre_ana_buf.back()->buf;
+//      pre_ana_buf.back()->buf = NULL;
+//      delete pre_ana_buf.back();
+//      pre_ana_buf.back() = NULL;
+//      pre_ana_buf.pop_back();
+//    }
+//    
+//  }
+//
+//  int xCalcHADs8x8_ISlice(const Pel *piOrg, const int iStrideOrg)
+//  {
+//    int k, i, j, jj;
+//    int diff[64], m1[8][8], m2[8][8], m3[8][8], iSumHad = 0;
+//
+//    for (k = 0; k < 64; k += 8)
+//    {
+//      diff[k + 0] = piOrg[0];
+//      diff[k + 1] = piOrg[1];
+//      diff[k + 2] = piOrg[2];
+//      diff[k + 3] = piOrg[3];
+//      diff[k + 4] = piOrg[4];
+//      diff[k + 5] = piOrg[5];
+//      diff[k + 6] = piOrg[6];
+//      diff[k + 7] = piOrg[7];
+//
+//      piOrg += iStrideOrg;
+//    }
+//
+//    //horizontal
+//    for (j = 0; j < 8; j++)
+//    {
+//      jj = j << 3;
+//      m2[j][0] = diff[jj] + diff[jj + 4];
+//      m2[j][1] = diff[jj + 1] + diff[jj + 5];
+//      m2[j][2] = diff[jj + 2] + diff[jj + 6];
+//      m2[j][3] = diff[jj + 3] + diff[jj + 7];
+//      m2[j][4] = diff[jj] - diff[jj + 4];
+//      m2[j][5] = diff[jj + 1] - diff[jj + 5];
+//      m2[j][6] = diff[jj + 2] - diff[jj + 6];
+//      m2[j][7] = diff[jj + 3] - diff[jj + 7];
+//
+//      m1[j][0] = m2[j][0] + m2[j][2];
+//      m1[j][1] = m2[j][1] + m2[j][3];
+//      m1[j][2] = m2[j][0] - m2[j][2];
+//      m1[j][3] = m2[j][1] - m2[j][3];
+//      m1[j][4] = m2[j][4] + m2[j][6];
+//      m1[j][5] = m2[j][5] + m2[j][7];
+//      m1[j][6] = m2[j][4] - m2[j][6];
+//      m1[j][7] = m2[j][5] - m2[j][7];
+//
+//      m2[j][0] = m1[j][0] + m1[j][1];
+//      m2[j][1] = m1[j][0] - m1[j][1];
+//      m2[j][2] = m1[j][2] + m1[j][3];
+//      m2[j][3] = m1[j][2] - m1[j][3];
+//      m2[j][4] = m1[j][4] + m1[j][5];
+//      m2[j][5] = m1[j][4] - m1[j][5];
+//      m2[j][6] = m1[j][6] + m1[j][7];
+//      m2[j][7] = m1[j][6] - m1[j][7];
+//    }
+//
+//    //vertical
+//    for (i = 0; i < 8; i++)
+//    {
+//      m3[0][i] = m2[0][i] + m2[4][i];
+//      m3[1][i] = m2[1][i] + m2[5][i];
+//      m3[2][i] = m2[2][i] + m2[6][i];
+//      m3[3][i] = m2[3][i] + m2[7][i];
+//      m3[4][i] = m2[0][i] - m2[4][i];
+//      m3[5][i] = m2[1][i] - m2[5][i];
+//      m3[6][i] = m2[2][i] - m2[6][i];
+//      m3[7][i] = m2[3][i] - m2[7][i];
+//
+//      m1[0][i] = m3[0][i] + m3[2][i];
+//      m1[1][i] = m3[1][i] + m3[3][i];
+//      m1[2][i] = m3[0][i] - m3[2][i];
+//      m1[3][i] = m3[1][i] - m3[3][i];
+//      m1[4][i] = m3[4][i] + m3[6][i];
+//      m1[5][i] = m3[5][i] + m3[7][i];
+//      m1[6][i] = m3[4][i] - m3[6][i];
+//      m1[7][i] = m3[5][i] - m3[7][i];
+//
+//      m2[0][i] = m1[0][i] + m1[1][i];
+//      m2[1][i] = m1[0][i] - m1[1][i];
+//      m2[2][i] = m1[2][i] + m1[3][i];
+//      m2[3][i] = m1[2][i] - m1[3][i];
+//      m2[4][i] = m1[4][i] + m1[5][i];
+//      m2[5][i] = m1[4][i] - m1[5][i];
+//      m2[6][i] = m1[6][i] + m1[7][i];
+//      m2[7][i] = m1[6][i] - m1[7][i];
+//    }
+//
+//    for (i = 0; i < 8; i++)
+//    {
+//      for (j = 0; j < 8; j++)
+//      {
+//        iSumHad += abs(m2[i][j]);
+//      }
+//    }
+//    iSumHad -= abs(m2[0][0]);
+//    iSumHad = (iSumHad + 2) >> 2;
+//    return(iSumHad);
+//  }
+//
+//  int CalIntraSATD(int idx)
+//  {
+//    /*for (int y = 0; y < frameh; y += CTUsize)
+//    {
+//      for (int x=0;x<framew;x+=CTUsize)
+//      {
+//        Area CurCU = Area(x, y, min(CTUsize, framew - x), min(CTUsize, frameh - y));
+//
+//      }
+//        
+//    }
+//  */
+//
+//    /////default 
+//    /*int  xBl, yBl;
+//    const int iBlkSize = CTUsize;
+//    const Pel* pOrgInit = pre_ana_buf[idx]->buf;
+//    int  iStrideOrig = pre_ana_buf[idx]->stride;
+//
+//    int iSumHad = 0;
+//    printf("\n");
+//
+//    for (yBl = 0; (yBl + iBlkSize) <= pre_ana_buf[idx]->height; yBl += iBlkSize)
+//    {
+//      for (xBl = 0; (xBl + iBlkSize) <= pre_ana_buf[idx]->width; xBl += iBlkSize)
+//      {
+//        const Pel* pOrg = pOrgInit + iStrideOrig * yBl + xBl;
+//        printf("%d\t", xCalcHADs8x8_ISlice(pOrg, iStrideOrig));
+//        iSumHad += xCalcHADs8x8_ISlice(pOrg, iStrideOrig);
+//        
+//      }
+//    }
+//    return(iSumHad);*/
+//  
+//    Pel* tbuf = (Pel*) xMalloc(Pel, CTUsize*CTUsize);
+//    PelBuf tmp(tbuf, CTUsize, CTUsize);
+//    for (int y = 0; y < frameh; y += CTUsize)
+//    {
+//      for (int x = 0; x < framew; x += CTUsize)
+//      {
+//        Area CurCU = Area(x, y, min(CTUsize, framew - x), min(CTUsize, frameh - y));
+//        tmp.fill(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize).computeAvg());
+//        auto dist = m_pcRdCost->getDistPart(org, reco, cs.sps->getBitDepth(toChannelType(compID)), compID, DF_SSE);
+//
+//      }
+//    }
+//  }
+//};
+//
+//
+//
+//#endif
 
 #endif
 

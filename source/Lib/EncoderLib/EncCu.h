@@ -301,8 +301,305 @@ protected:
   void xCheckRDCostIBCModeMerge2Nx2N( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode );
 
   void xCheckPLT              ( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode );
+
+#if pre_ana
+  public:
+  RdCost* getRDcost() { return m_pcRdCost; }
+#endif
+
 };
 
 //! \}
+
+
+
+#if pre_ana
+
+
+class pre_analysis
+{
+public:
+  int m_size;
+  vector<PelBuf*> pre_ana_buf;
+  vector<vector<uint64_t>> CUSATD;
+  vector<uint64_t> FrameSATD;
+  int curidx;
+  int CTUsize = 64;
+  int framew;
+  int frameh;
+  RdCost *m_pcRdCost;
+  int TotalCTUNum;
+
+  int IBCRef[4][3][2];
+
+  pre_analysis(int iframew, int iframeh) {
+    m_size = 0; curidx = 0; framew = iframew; frameh = iframeh;
+  }
+  //~pre_analysis();
+
+  void init()
+  {
+    FrameSATD.resize(m_size);
+    CUSATD.resize(m_size);
+
+    int numx = framew / 128 + ((framew % 128) == 0 ? 0 : 1);
+    int numy = frameh / 128 + ((frameh % 128) == 0 ? 0 : 1);
+    TotalCTUNum = numx * numy;
+    
+    for(int i=0;i< m_size;i++)
+      CUSATD[i].resize(TotalCTUNum);
+
+
+    IBCRef[0][0][0] = -64;
+    IBCRef[0][0][1] = 0;
+    IBCRef[0][1][0] = -64;
+    IBCRef[0][1][1] = 64;
+    IBCRef[0][2][0] = -128;
+    IBCRef[0][2][1] = 64;
+
+    IBCRef[1][0][0] = -64;
+    IBCRef[1][0][1] = 0;
+    IBCRef[1][1][0] = -128;
+    IBCRef[1][1][1] = 64;
+    IBCRef[1][2][0] = -192;
+    IBCRef[1][2][1] = 64;
+
+    IBCRef[2][0][0] = -64;
+    IBCRef[2][0][1] = 0;
+    IBCRef[2][1][0] = 0;
+    IBCRef[2][1][1] = 64;
+    IBCRef[2][2][0] = 64;
+    IBCRef[2][2][1] = -64;
+
+    IBCRef[3][0][0] = -64;
+    IBCRef[3][0][1] = -64;
+    IBCRef[3][1][0] = 0;
+    IBCRef[3][1][1] = -64;
+    IBCRef[3][2][0] = -64;
+    IBCRef[3][2][1] = 0;
+  }
+
+  Position getCTUPos(int ctuidx)
+  {
+    int numx = framew / 128 + ((framew % 128) == 0 ? 0 : 1);
+    int numy = frameh / 128 + ((frameh % 128) == 0 ? 0 : 1);
+    int x = ctuidx % numx*128;
+    int y = ctuidx / numx * 128;
+    return Position(x, y);
+  }
+  void createbuf(int w, int h)
+  {
+    for (int i = 0; i < m_size; i++)
+    {
+      //pre_ana_buf.push_back( new PelBuf);
+      Pel *tbuf = new Pel[w*h];
+
+      //PelBuf temp((Pel*)xMalloc(Pel, w*h), w, h);
+      PelBuf temp(tbuf, w, h);
+      pre_ana_buf.push_back(&temp);
+
+    }
+  }
+
+  void addbuf(int n)
+  {
+    if (n > 0)
+    {
+      for (int i = 0; i < n; i++)
+      {
+        pre_ana_buf.push_back(new PelBuf);
+      }
+    }
+  }
+
+  //void update(int n)
+  //{
+  //  for (int i = 0; i < n; i++)
+  //  {
+  //    pre_ana_buf.push_back(pre_ana_buf.front()); pre_ana_buf.pop_front();
+  //  }
+  //}
+
+  void destroy()
+  {
+    while (pre_ana_buf.size() != 0)
+    {
+      delete pre_ana_buf.back()->buf;
+      pre_ana_buf.back()->buf = NULL;
+      delete pre_ana_buf.back();
+      pre_ana_buf.back() = NULL;
+      pre_ana_buf.pop_back();
+    }
+
+  }
+
+
+  //uint64_t CalIntraSATD(int fidx)
+  //{
+  //  Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+  //  
+  //  uint64_t dist;
+  //  for (int yctu = 0; yctu < frameh; yctu += 128)
+  //  {
+  //    for (int xctu = 0; xctu < framew; xctu += 128)
+  //    {
+  //      for (int y = yctu; y < min(yctu+128,frameh); y += CTUsize)
+  //      {
+  //        for (int x = xctu; x < min(framew,xctu+128); x += CTUsize)
+  //        {
+  //          int w = min(CTUsize, framew - x);
+  //          int h = min(CTUsize, frameh - y);
+  //          Area CurCU = Area(x, y, w, h);
+  //          PelBuf tmp(tbuf, w, h);
+  //          tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
+  //          dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
+  //          //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
+  //        }
+  //      }
+
+  //    }
+  //  }
+  //  return dist;
+  //}
+
+  //uint64_t CalIBCSATD(int fidx)
+  //{
+  //  Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+  //  
+  //  
+  //  int IBCIdx = 0;
+  //  for (int yctu = 0; yctu < frameh; yctu += 128)
+  //  {
+  //    for (int xctu = 0; xctu < framew; xctu += 128)
+  //    {
+  //      for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+  //      {
+  //        for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+  //        {
+  //          int w = min(CTUsize, framew - x);
+  //          int h = min(CTUsize, frameh - y);
+  //          Area CurCU = Area(x, y, w, h);
+  //          PelBuf tmp(tbuf, w, h);
+  //          if (x == xctu && y == yctu)
+  //            IBCIdx = 0;
+  //          else if (x == xctu + CTUsize && y == yctu)
+  //            IBCIdx = 1;
+  //          else if (x == xctu && y == yctu + CTUsize)
+  //            IBCIdx = 2;
+  //          else if (x == xctu + CTUsize && y == yctu + CTUsize)
+  //            IBCIdx = 3;
+  //          uint64_t dist = MAX_INT;
+  //          for (int refidx = 0; refidx < 3; refidx++)
+  //          {
+  //            if (x + IBCRef[IBCIdx][refidx][0] >= 0 && y + IBCRef[IBCIdx][refidx][1] >= 0)
+  //            {
+  //              Area RefCU = Area(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], min(CTUsize, framew - x), min(CTUsize, frameh - y));
+
+
+  //              tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
+  //              dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD));
+  //              //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
+  //            }
+  //          }
+  //        }
+  //      }
+
+  //    }
+  //  }
+  //  return 0;
+  //}
+
+  uint64_t CalIntraSATD(int fidx,int ctuidx)
+  {
+    Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+
+    uint64_t dist;
+    Position CTUPos = getCTUPos(ctuidx);
+    int xctu = CTUPos.x;
+    int yctu = CTUPos.y;
+    int IBCIdx = 0;
+        for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+        {
+          for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+          {
+            int w = min(CTUsize, framew - x);
+            int h = min(CTUsize, frameh - y);
+            Area CurCU = Area(x, y, w, h);
+            if (x == xctu && y == yctu)
+              IBCIdx = 0;
+            else if (x == xctu + CTUsize && y == yctu)
+              IBCIdx = 1;
+            else if (x == xctu && y == yctu + CTUsize)
+              IBCIdx = 2;
+            else if (x == xctu + CTUsize && y == yctu + CTUsize)
+              IBCIdx = 3;
+            PelBuf tmp(tbuf, w, h);
+            tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
+            dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
+            CUSATD[fidx][ctuidx].push_back(dist);
+            //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
+          }
+        }
+
+  
+    return dist;
+  }
+
+  uint64_t CalIBCSATD(int fidx,int ctuidx)
+  {
+    Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+
+
+    int IBCIdx = 0;
+    Position CTUPos = getCTUPos(ctuidx);
+    int xctu = CTUPos.x;
+    int yctu = CTUPos.y;
+    
+        for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+        {
+          for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+          {
+            int w = min(CTUsize, framew - x);
+            int h = min(CTUsize, frameh - y);
+            Area CurCU = Area(x, y, w, h);
+            PelBuf tmp(tbuf, w, h);
+            if (x == xctu && y == yctu)
+              IBCIdx = 0;
+            else if (x == xctu + CTUsize && y == yctu)
+              IBCIdx = 1;
+            else if (x == xctu && y == yctu + CTUsize)
+              IBCIdx = 2;
+            else if (x == xctu + CTUsize && y == yctu + CTUsize)
+              IBCIdx = 3;
+            uint64_t dist = MAX_INT;
+            for (int refidx = 0; refidx < 3; refidx++)
+            {
+              if (x + IBCRef[IBCIdx][refidx][0] >= 0 && y + IBCRef[IBCIdx][refidx][1] >= 0)
+              {
+                Area RefCU = Area(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], min(CTUsize, framew - x), min(CTUsize, frameh - y));
+
+
+                tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
+                dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD));
+                //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
+              }
+            }
+          }
+        }
+
+
+    return 0;
+  }
+
+  uint64_t CalInterSATD(int fidx)
+  {
+    ;
+  }
+
+};
+
+
+
+#endif
 
 #endif // __ENCMB__

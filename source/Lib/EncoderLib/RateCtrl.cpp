@@ -1954,6 +1954,6 @@ void RateCtrl::destroyRCGOP()
 
 #if pre_ana
 
-extern pre_analysis pa= pre_analysis();
+//extern pre_analysis pa= pre_analysis();
 
 #endif

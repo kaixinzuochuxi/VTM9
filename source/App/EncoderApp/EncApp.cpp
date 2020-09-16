@@ -48,6 +48,7 @@
 
 #if pre_ana
 #include "EncoderLib/RateCtrl.h"
+#include "EncoderLib/EncCu.h"
 #endif
 using namespace std;
 
@@ -1080,13 +1081,13 @@ bool EncApp::encodePrep( bool& eos )
   else if (m_iGOPSize == 1)
   {
     int num_pre_ana = 16;
-    if (m_cEncLib.m_iPOCLast == -1)
+    //if (m_cEncLib.m_iPOCLast == -1)
     {
-      extern pre_analysis pa;
+      pre_analysis pa= pre_analysis(m_iSourceWidth,m_iSourceHeight);
 
       pa.m_size = num_pre_ana;
-      //pa.createbuf(m_iSourceWidth, m_iSourceHeight);
-      
+      pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      pa.init();
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
         int xxx = 0;
@@ -1104,15 +1105,22 @@ bool EncApp::encodePrep( bool& eos )
         tmp->copyFrom(m_orgPic->bufs[0]);
         
         //pa.pre_ana_buf[fidx]
-        pa.pre_ana_buf.push_back( tmp);
+        pa.pre_ana_buf.push_back(tmp);
       }
       int  xxx = 0;
+
+      // test destory
+      //pa.destroy();
+
+      // test intra SATD
+      pa.CalIntraSATD(0);
+      pa.CalIBCSATD(0);
     }
     
     
 
   }
-
+  m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
 #endif
   // read input YUV file
 #if EXTENSION_360_VIDEO
@@ -1127,7 +1135,7 @@ bool EncApp::encodePrep( bool& eos )
 #else
   m_cVideoIOYuvInputFile.read( *m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range );
 #endif
-  //m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
+  
   if( m_gopBasedTemporalFilterEnabled )
   {
     m_temporalFilter.filter( m_orgPic, m_iFrameRcvd );
