@@ -1066,17 +1066,62 @@ bool EncApp::encodePrep( bool& eos )
   }
   else if(m_iGOPSize==8)
   {
+    int num_pre_ana = 0;
     if (m_cEncLib.m_iPOCLast == -1)
     {
       
       // start of the sequence
-      int num_pre_ana = 32 + 1;
+      num_pre_ana = 32 + 1;
     }
     else if ((m_cEncLib.m_iPOCLast + 1) % m_iGOPSize == 0)
     {
       // start of a new GOP
-      int num_pre_ana = 32;
+      num_pre_ana = 32;
     }
+    
+    pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
+
+    pa.m_size = num_pre_ana;
+    pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+    //pa.RefList0 = &m_RPLList0;
+    pa.init();
+    for (int fidx = 0; fidx < num_pre_ana; fidx++)
+    {
+      int xxx = 0;
+      m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
+
+
+
+      Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
+      PelBuf * tmp = new PelBuf;
+      tmp->buf = tbuf;
+      tmp->stride = m_iSourceWidth;
+      tmp->width = m_iSourceWidth;
+      tmp->height = m_iSourceHeight;
+      //tmp((Pel*)xMalloc(Pel, m_iSourceWidth*m_iSourceHeight), m_iSourceWidth, m_iSourceHeight);
+      tmp->copyFrom(m_orgPic->bufs[0]);
+
+      //pa.pre_ana_buf[fidx]
+      pa.pre_ana_buf.push_back(tmp);
+    }
+    
+    for (int fidx = 0; fidx < num_pre_ana; fidx++)
+    {
+      for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+      {
+        int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+        auto dInter = pa.CalInterSATD(1, 0, m_RPLList0[curPOC],m_RPLList1[curPOC]);
+        auto dIntra = pa.CalIntraSATD(0, ctuidx);
+        auto dIBC = pa.CalIBCSATD(0, ctuidx);
+        for (int cuidx = 0; cuidx < 4; cuidx++)
+        {
+          pa.CUSATD[fidx][ctuidx].push_back(min(dIntra[cuidx], dIBC[cuidx]));
+          int x = 0;
+        }
+        int x = 0;
+      }
+    }
+
   }
   else if (m_iGOPSize == 1)
   {
@@ -1087,6 +1132,7 @@ bool EncApp::encodePrep( bool& eos )
 
       pa.m_size = num_pre_ana;
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      //pa.RefList0 = &m_RPLList0;
       pa.init();
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
@@ -1106,15 +1152,39 @@ bool EncApp::encodePrep( bool& eos )
         
         //pa.pre_ana_buf[fidx]
         pa.pre_ana_buf.push_back(tmp);
+      }      
+
+      for (int fidx = 0; fidx < num_pre_ana; fidx++)
+      {
+        for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+        {
+          auto dIntra=pa.CalIntraSATD(0, ctuidx);
+          auto dIBC = pa.CalIBCSATD(0, ctuidx);
+          for (int cuidx = 0; cuidx < 4; cuidx++)
+          {
+            pa.CUSATD[fidx][ctuidx].push_back(min(dIntra[cuidx], dIBC[cuidx]));
+            int x = 0;
+          }
+          int x = 0;
+        }
       }
-      int  xxx = 0;
+      
+
+      // test intra SATD
+      for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+      {
+        pa.CalIntraSATD(0, ctuidx);
+        auto t=pa.CalIBCSATD(0, ctuidx);
+        int x = 0;
+      }
+      
+      //pa.CalIBCSATD(0);
+      int xx = 0;
+
+      //m_RPLList0.
 
       // test destory
       //pa.destroy();
-
-      // test intra SATD
-      pa.CalIntraSATD(0);
-      pa.CalIBCSATD(0);
     }
     
     
