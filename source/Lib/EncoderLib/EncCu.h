@@ -55,6 +55,8 @@
 #include "InterSearch.h"
 #include "RateCtrl.h"
 #include "EncModeCtrl.h"
+
+
 //! \ingroup EncoderLib
 //! \{
 
@@ -304,7 +306,7 @@ protected:
 
 #if pre_ana
   public:
-  RdCost* getRDcost() { return m_pcRdCost; }
+    RdCost*     getRDcost() { return      m_pcRdCost; }
 #endif
 
 };
@@ -314,8 +316,8 @@ protected:
 
 
 #if pre_ana
-
-
+int getRPLIdxLDB(int poc);
+int getRPLIdxRA(int poc);
 class pre_analysis
 {
 public:
@@ -328,12 +330,14 @@ public:
   int framew;
   int frameh;
   RdCost *m_pcRdCost;
+  //EncCu *m_pcEncCu;
+  EncLib *m_pclib;
   int TotalCTUNum;
   //RPLEntry RefList0[MAX_GOP];
   int IBCRef[4][3][2];
 
   pre_analysis(int iframew, int iframeh) {
-    m_size = 0; curidx = 0; framew = iframew; frameh = iframeh;
+    m_size = 0; curidx = 0; framew = iframew; frameh = iframeh; 
   }
   //~pre_analysis();
 
@@ -412,13 +416,6 @@ public:
     }
   }
 
-  //void update(int n)
-  //{
-  //  for (int i = 0; i < n; i++)
-  //  {
-  //    pre_ana_buf.push_back(pre_ana_buf.front()); pre_ana_buf.pop_front();
-  //  }
-  //}
 
   void destroy()
   {
@@ -433,81 +430,8 @@ public:
 
   }
 
+  
 
-  //uint64_t CalIntraSATD(int fidx)
-  //{
-  //  Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
-  //  
-  //  uint64_t dist;
-  //  for (int yctu = 0; yctu < frameh; yctu += 128)
-  //  {
-  //    for (int xctu = 0; xctu < framew; xctu += 128)
-  //    {
-  //      for (int y = yctu; y < min(yctu+128,frameh); y += CTUsize)
-  //      {
-  //        for (int x = xctu; x < min(framew,xctu+128); x += CTUsize)
-  //        {
-  //          int w = min(CTUsize, framew - x);
-  //          int h = min(CTUsize, frameh - y);
-  //          Area CurCU = Area(x, y, w, h);
-  //          PelBuf tmp(tbuf, w, h);
-  //          tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
-  //          dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
-  //          //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
-  //        }
-  //      }
-
-  //    }
-  //  }
-  //  return dist;
-  //}
-
-  //uint64_t CalIBCSATD(int fidx)
-  //{
-  //  Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
-  //  
-  //  
-  //  int IBCIdx = 0;
-  //  for (int yctu = 0; yctu < frameh; yctu += 128)
-  //  {
-  //    for (int xctu = 0; xctu < framew; xctu += 128)
-  //    {
-  //      for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
-  //      {
-  //        for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
-  //        {
-  //          int w = min(CTUsize, framew - x);
-  //          int h = min(CTUsize, frameh - y);
-  //          Area CurCU = Area(x, y, w, h);
-  //          PelBuf tmp(tbuf, w, h);
-  //          if (x == xctu && y == yctu)
-  //            IBCIdx = 0;
-  //          else if (x == xctu + CTUsize && y == yctu)
-  //            IBCIdx = 1;
-  //          else if (x == xctu && y == yctu + CTUsize)
-  //            IBCIdx = 2;
-  //          else if (x == xctu + CTUsize && y == yctu + CTUsize)
-  //            IBCIdx = 3;
-  //          uint64_t dist = MAX_INT;
-  //          for (int refidx = 0; refidx < 3; refidx++)
-  //          {
-  //            if (x + IBCRef[IBCIdx][refidx][0] >= 0 && y + IBCRef[IBCIdx][refidx][1] >= 0)
-  //            {
-  //              Area RefCU = Area(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], min(CTUsize, framew - x), min(CTUsize, frameh - y));
-
-
-  //              tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
-  //              dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD));
-  //              //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
-  //            }
-  //          }
-  //        }
-  //      }
-
-  //    }
-  //  }
-  //  return 0;
-  //}
 
   vector<uint64_t> CalIntraSATD(int fidx,int ctuidx)
   {
@@ -605,20 +529,29 @@ public:
     return d;
   }
 
-  vector<uint64_t>  CalInterSATD(int fidx,int ctuidx, RPLEntry rpl, RPLEntry rp2)
+  vector<uint64_t>  CalInterSATD(int fidx,int ctuidx, RPLEntry rpl1, RPLEntry rpl2)
   {
     Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
 
-    //uint64_t dist;
-    //Position CTUPos = getCTUPos(ctuidx);
-    //int xctu = CTUPos.x;
-    //int yctu = CTUPos.y;
-    //int IBCIdx = 0;
+    uint64_t dist=MAX_INT;
+    Position CTUPos = getCTUPos(ctuidx);
+    int xctu = CTUPos.x;
+    int yctu = CTUPos.y;
+    int IBCIdx = 0;
     vector<uint64_t> d = { 0,0,0,0 };
     // obtain ref list
-    int numRefPics = rpl.m_numRefPicsActive;
-    int deltaRefPics[MAX_NUM_REF_PICS] = {0};
-    memcpy(deltaRefPics, rpl.m_deltaRefPics, numRefPics * sizeof(int));
+    int numRefPics = rpl1.m_numRefPicsActive;
+    int deltaRefPics0[MAX_NUM_REF_PICS] = {0};
+    memcpy(deltaRefPics0, rpl1.m_deltaRefPics, numRefPics * sizeof(int));
+
+    numRefPics = rpl2.m_numRefPicsActive;
+    int deltaRefPics1[MAX_NUM_REF_PICS] = { 0 };
+    memcpy(deltaRefPics1, rpl2.m_deltaRefPics, numRefPics * sizeof(int));
+
+
+
+
+
 
     // for L0
 
@@ -630,6 +563,60 @@ public:
     return d;
   }
 
+  //int CalRPLIdx(int POCCurr)
+  //{
+  //  
+  //  int m_iGOPSize = m_pclib->getGOPSize();
+  //  int fullListNum = m_iGOPSize;
+  //  int partialListNum = m_pclib->getRPLCandidateSize(0) - m_iGOPSize;
+  //  int extraNum = fullListNum;
+
+  //  int rplPeriod = m_pclib->getIntraPeriod();
+  //  if (rplPeriod < 0)  //Need to check if it is low delay or RA but with no RAP
+  //  {
+  //    //if (slice->getSPS()->getRPLList0()->getReferencePictureList(1)->getRefPicIdentifier(0) * slice->getSPS()->getRPLList1()->getReferencePictureList(1)->getRefPicIdentifier(0) < 0)
+  //    if (m_pclib->getSPS(0)->getRPLList0()->getReferencePictureList(1)->getRefPicIdentifier(0) * m_pclib->getSPS(0)->getRPLList1()->getReferencePictureList(1)->getRefPicIdentifier(0) < 0)
+  //    {
+  //      rplPeriod = m_iGOPSize * 2;
+  //      
+  //    }
+  //  }
+
+  //  if (rplPeriod < 0)
+  //  {
+  //    // first 18 frames in seq
+  //    if (POCCurr < (2 * m_iGOPSize + 2))
+  //    {
+  //      //int candidateIdx = (POCCurr + m_iGOPSize - 1 >= fullListNum + partialListNum) ? GOPid : POCCurr + m_iGOPSize - 1;
+  //      //return candidateIdx;
+  //      return POCCurr+7;
+  //    }
+  //    else
+  //    {
+  //      return ((POCCurr%m_iGOPSize == 0) ? m_iGOPSize - 1 : POCCurr % m_iGOPSize - 1);
+  //      
+  //    }
+  //    extraNum = fullListNum + partialListNum;
+  //  }
+  //  for (; extraNum < fullListNum + partialListNum; extraNum++)
+  //  {
+  //    if (rplPeriod > 0)
+  //    {
+  //      int POCIndex = POCCurr % rplPeriod;
+  //      if (POCIndex == 0)
+  //      {
+  //        POCIndex = rplPeriod;
+  //      }
+  //      if (POCIndex == m_pclib->getRPLEntry(1,extraNum).m_POC)
+  //      {
+  //        
+  //        return extraNum;
+  //      }
+  //    }
+  //  }
+
+  //  
+  //}
 };
 
 

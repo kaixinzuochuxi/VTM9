@@ -4730,5 +4730,21 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
 }
 #endif
 
-
+#if pre_ana
+int getRPLIdxLDB(int poc)
+{
+  if (poc < 18)
+  {
+    return poc + 7;
+  }
+  else
+  {
+    return (poc - 1) % 8;
+  }
+}
+int getRPLIdxRA(int poc)
+{
+  return 0;
+}
+#endif
 //! \}

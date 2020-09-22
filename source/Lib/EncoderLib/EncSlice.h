@@ -63,7 +63,6 @@ class EncSlice
 private:
   // encoder configuration
   EncCfg*                 m_pcCfg;                              ///< encoder configuration class
-
   EncLib*                 m_pcLib;
 
   // pictures
@@ -148,6 +147,9 @@ public:
   void    setEncCABACTableIdx (SliceType b)         { m_encCABACTableIdx = b; }
 private:
   double  xGetQPValueAccordingToLambda ( double lambda );
+
+
+
 };
 
 //! \}

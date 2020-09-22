@@ -1083,6 +1083,8 @@ bool EncApp::encodePrep( bool& eos )
 
     pa.m_size = num_pre_ana;
     pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+    //pa.m_pcEncCu = m_cEncLib.getCuEncoder();
+    pa.m_pclib = &m_cEncLib;
     //pa.RefList0 = &m_RPLList0;
     pa.init();
     for (int fidx = 0; fidx < num_pre_ana; fidx++)
@@ -1105,11 +1107,17 @@ bool EncApp::encodePrep( bool& eos )
       pa.pre_ana_buf.push_back(tmp);
     }
     
-    for (int fidx = 0; fidx < num_pre_ana; fidx++)
+    //for (int fidx = 0; fidx < num_pre_ana; fidx++)
+    for (int fidx = 0; fidx < 1; fidx++)
     {
+      int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+
+      int rplidx = getRPLIdxLDB(curPOC);
+      //int rplidx = pa.CalRPLIdx(curPOC);
+      printf("rplidx:%d\n", rplidx);
       for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
       {
-        int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+        
         auto dInter = pa.CalInterSATD(1, 0, m_RPLList0[curPOC],m_RPLList1[curPOC]);
         auto dIntra = pa.CalIntraSATD(0, ctuidx);
         auto dIBC = pa.CalIBCSATD(0, ctuidx);
@@ -1131,6 +1139,7 @@ bool EncApp::encodePrep( bool& eos )
       pre_analysis pa= pre_analysis(m_iSourceWidth,m_iSourceHeight);
 
       pa.m_size = num_pre_ana;
+      //pa.m_pcEncCu = m_cEncLib.getCuEncoder();
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
       //pa.RefList0 = &m_RPLList0;
       pa.init();
