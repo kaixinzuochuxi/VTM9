@@ -1078,59 +1078,67 @@ bool EncApp::encodePrep( bool& eos )
       // start of a new GOP
       num_pre_ana = 32;
     }
-    
-    pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
-
-    pa.m_size = num_pre_ana;
-    pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
-    //pa.m_pcEncCu = m_cEncLib.getCuEncoder();
-    pa.m_pclib = &m_cEncLib;
-    //pa.RefList0 = &m_RPLList0;
-    pa.init();
-    for (int fidx = 0; fidx < num_pre_ana; fidx++)
+    //if (num_pre_ana != 0)
+      if (1)
     {
-      int xxx = 0;
-      m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
+      pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
 
-
-
-      Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
-      PelBuf * tmp = new PelBuf;
-      tmp->buf = tbuf;
-      tmp->stride = m_iSourceWidth;
-      tmp->width = m_iSourceWidth;
-      tmp->height = m_iSourceHeight;
-      //tmp((Pel*)xMalloc(Pel, m_iSourceWidth*m_iSourceHeight), m_iSourceWidth, m_iSourceHeight);
-      tmp->copyFrom(m_orgPic->bufs[0]);
-
-      //pa.pre_ana_buf[fidx]
-      pa.pre_ana_buf.push_back(tmp);
-    }
-    
-    //for (int fidx = 0; fidx < num_pre_ana; fidx++)
-    for (int fidx = 0; fidx < 1; fidx++)
-    {
-      int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
-
-      int rplidx = getRPLIdxLDB(curPOC);
-      //int rplidx = pa.CalRPLIdx(curPOC);
-      printf("rplidx:%d\n", rplidx);
-      for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+      pa.m_size = num_pre_ana;
+      pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      //pa.m_pcEncCu = m_cEncLib.getCuEncoder();
+      //pa.m_pclib = &m_cEncLib;
+      //pa.RefList0 = &m_RPLList0;
+      pa.init();
+      for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
-        
-        auto dInter = pa.CalInterSATD(1, 0, m_RPLList0[curPOC],m_RPLList1[curPOC]);
-        auto dIntra = pa.CalIntraSATD(0, ctuidx);
-        auto dIBC = pa.CalIBCSATD(0, ctuidx);
-        for (int cuidx = 0; cuidx < 4; cuidx++)
+        int xxx = 0;
+        m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
+
+
+
+        Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
+        PelBuf * tmp = new PelBuf;
+        tmp->buf = tbuf;
+        tmp->stride = m_iSourceWidth;
+        tmp->width = m_iSourceWidth;
+        tmp->height = m_iSourceHeight;
+        //tmp((Pel*)xMalloc(Pel, m_iSourceWidth*m_iSourceHeight), m_iSourceWidth, m_iSourceHeight);
+        tmp->copyFrom(m_orgPic->bufs[0]);
+
+        //pa.pre_ana_buf[fidx]
+        pa.pre_ana_buf.push_back(tmp);
+      }
+
+      //for (int fidx = 0; fidx < num_pre_ana; fidx++)
+      for (int fidx = 0; fidx < 1; fidx++)
+      {
+        int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+
+        //int rplidx = getRPLIdxLDB(curPOC);
+        int rplidx = CalRPLIdx(curPOC);
+        printf("rplidx:%d\n", rplidx);
+        if (curPOC != 0)
         {
-          pa.CUSATD[fidx][ctuidx].push_back(min(dIntra[cuidx], dIBC[cuidx]));
+          auto dInter = pa.CalInterSATD(fidx, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+        }
+        /*for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+        {
+
+          auto dInter = pa.CalInterSATD(1, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+          auto dIntra = pa.CalIntraSATD(0, ctuidx);
+          auto dIBC = pa.CalIBCSATD(0, ctuidx);
+          for (int cuidx = 0; cuidx < 4; cuidx++)
+          {
+            pa.CUSATD[fidx][ctuidx].push_back(min(dIntra[cuidx], dIBC[cuidx]));
+            int x = 0;
+          }
           int x = 0;
         }
-        int x = 0;
+*/
       }
     }
-
   }
+  ///// AI
   else if (m_iGOPSize == 1)
   {
     int num_pre_ana = 16;
@@ -1443,4 +1451,26 @@ void EncApp::printChromaFormat()
   }
 }
 
+
+#if pre_ana
+int EncApp::CalRPLIdx(int POCCurr)
+{
+  if (m_iGOPSize == 16)
+  {
+    return 0;
+  }
+  else if (m_iGOPSize == 8)
+  {
+    if (POCCurr < 18)
+    {
+      return POCCurr + 7;
+    }
+    else
+    {
+      return (POCCurr - 1) % 8;
+    }
+  }
+  return -1;
+}
+#endif
 //! \}

@@ -331,7 +331,7 @@ public:
   int frameh;
   RdCost *m_pcRdCost;
   //EncCu *m_pcEncCu;
-  EncLib *m_pclib;
+  //EncLib *m_pclib;
   int TotalCTUNum;
   //RPLEntry RefList0[MAX_GOP];
   int IBCRef[4][3][2];
@@ -467,7 +467,7 @@ public:
           }
         }
 
-  
+        xFree(tbuf);
     return d;
   }
 
@@ -525,39 +525,90 @@ public:
           }
         }
 
-
+        xFree(tbuf);
     return d;
   }
 
   vector<uint64_t>  CalInterSATD(int fidx,int ctuidx, RPLEntry rpl1, RPLEntry rpl2)
   {
-    Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+    
 
-    uint64_t dist=MAX_INT;
+    
     Position CTUPos = getCTUPos(ctuidx);
     int xctu = CTUPos.x;
     int yctu = CTUPos.y;
     int IBCIdx = 0;
     vector<uint64_t> d = { 0,0,0,0 };
     // obtain ref list
-    int numRefPics = rpl1.m_numRefPicsActive;
+    int numRefPics0 = rpl1.m_numRefPicsActive;
     int deltaRefPics0[MAX_NUM_REF_PICS] = {0};
-    memcpy(deltaRefPics0, rpl1.m_deltaRefPics, numRefPics * sizeof(int));
+    memcpy(deltaRefPics0, rpl1.m_deltaRefPics, numRefPics0 * sizeof(int));
 
-    numRefPics = rpl2.m_numRefPicsActive;
+    int numRefPics1 = rpl2.m_numRefPicsActive;
     int deltaRefPics1[MAX_NUM_REF_PICS] = { 0 };
-    memcpy(deltaRefPics1, rpl2.m_deltaRefPics, numRefPics * sizeof(int));
+    memcpy(deltaRefPics1, rpl2.m_deltaRefPics, numRefPics1 * sizeof(int));
+
+    
+    for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+    {
+      for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+      {
+        uint64_t dist = MAX_INT;
+        int w = min(CTUsize, framew - x);
+        int h = min(CTUsize, frameh - y);
+        Area CurCU = Area(x, y, w, h);
+        if (x == xctu && y == yctu)
+          IBCIdx = 0;
+        else if (x == xctu + CTUsize && y == yctu)
+          IBCIdx = 1;
+        else if (x == xctu && y == yctu + CTUsize)
+          IBCIdx = 2;
+        else if (x == xctu + CTUsize && y == yctu + CTUsize)
+          IBCIdx = 3;
+        
+
+        // for L0
+        for (int refidx = 0; refidx < numRefPics0; refidx++)
+        {
+          int refpoc = fidx - deltaRefPics0[refidx];
+
+          dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
+          
+        }
+        // for L1 if not LDP
+        for (int refidx = 0; refidx < numRefPics1; refidx++)
+        {
+          int refpoc = fidx - deltaRefPics1[refidx];
+
+          dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
+
+        }
+        // for combine if not LDP}
+        if (numRefPics1 != 0 && numRefPics0 != 0)
+        {
+          int refpoc0 = fidx - deltaRefPics0[0];
+          int refpoc1 = fidx - deltaRefPics1[0];
+          if (refpoc0 != refpoc1)
+          {
+            Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+            PelBuf tmp(tbuf, w, h);
+            int BD = 10;
+            ClpRng t=ClpRng();
+            t.min = 0;
+            t.max = (1 << BD) - 1;
+            t.bd = BD;
+            t.n = 0; 
+           
+            tmp.addAvg(pre_ana_buf[refpoc0]->subBuf(x, y, w, h), pre_ana_buf[refpoc1]->subBuf(x, y, w, h),t);
+          }
+        }
 
 
 
+        d[IBCIdx] = dist;
+      }
+    }
 
-
-
-    // for L0
-
-    // for L1 if not LDP
-
-    // for combine if not LDP
 
     
     return d;
