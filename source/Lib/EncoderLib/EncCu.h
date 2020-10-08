@@ -336,6 +336,9 @@ public:
   //RPLEntry RefList0[MAX_GOP];
   int IBCRef[4][3][2];
 
+  pre_analysis() {
+    m_size = 0; curidx = 0;
+  }
   pre_analysis(int iframew, int iframeh) {
     m_size = 0; curidx = 0; framew = iframew; frameh = iframeh; 
   }
@@ -430,7 +433,12 @@ public:
 
   }
 
-  
+  void clearSATD()
+  {
+    CUSATD.clear();
+    FrameSATD.clear();
+
+  }
 
 
   vector<uint64_t> CalIntraSATD(int fidx,int ctuidx)
@@ -547,7 +555,17 @@ public:
     int numRefPics1 = rpl2.m_numRefPicsActive;
     int deltaRefPics1[MAX_NUM_REF_PICS] = { 0 };
     memcpy(deltaRefPics1, rpl2.m_deltaRefPics, numRefPics1 * sizeof(int));
-
+    /*printf("L0:  ");
+    for (int i = 0; i < numRefPics0; i++)
+    {
+      printf("%d  ", fidx- deltaRefPics0[i]);
+    }
+    printf("L1:  ");
+    for (int i = 0; i < numRefPics1; i++)
+    {
+      printf("%d  ", fidx - deltaRefPics1[i]);
+    }
+    printf("\n");*/
     
     for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
     {
@@ -571,9 +589,18 @@ public:
         for (int refidx = 0; refidx < numRefPics0; refidx++)
         {
           int refpoc = fidx - deltaRefPics0[refidx];
-
-          dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
-          
+          //if(refpoc>=0)
+          //{
+            dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_SSE));
+          //}
+          //else
+          //{
+            //dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
+          //}
+            if (IBCIdx == 0 && x == 0 && y == 0 && refidx==0)
+            {
+              printf("%d->%d:  %llu\n", fidx, refpoc,dist);
+            }
         }
         // for L1 if not LDP
         for (int refidx = 0; refidx < numRefPics1; refidx++)
@@ -609,7 +636,7 @@ public:
       }
     }
 
-
+    
     
     return d;
   }

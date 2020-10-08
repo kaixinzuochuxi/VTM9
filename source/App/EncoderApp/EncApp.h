@@ -124,6 +124,7 @@ public:
 
 #if pre_ana
   int CalRPLIdx(int POCCurr);
+  void pre_analyze();
 #endif
 };// END CLASS DEFINITION EncApp
 

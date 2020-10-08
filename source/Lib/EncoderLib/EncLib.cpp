@@ -755,6 +755,11 @@ bool EncLib::encodePrep( bool flush, PelStorage* pcPicYuvOrg, PelStorage* cPicYu
 bool EncLib::encode( const InputColourSpaceConversion snrCSC, std::list<PelUnitBuf*>& rcListPicYuvRecOut, int& iNumEncoded )
 {
   // compress GOP
+
+#if pre_ana
+  if (m_iPOCLast == 19)
+    int xxx = 0;
+#endif
   m_cGOPEncoder.compressGOP( m_iPOCLast, m_iNumPicRcvd, m_cListPic, rcListPicYuvRecOut,
     false, false, snrCSC, m_printFrameMSE, false, m_picIdInGOP );
 
@@ -2193,7 +2198,7 @@ void EncLib::selectReferencePictureList(Slice* slice, int POCCurr, int GOPid, in
   slice->setRPL0(rpl0);
   slice->setRPL1(rpl1);
 
-  printf("idx:%d\t", slice->getRPL0idx());
+  //printf("idx:%d\t", slice->getRPL0idx());
 }
 
 

@@ -4731,6 +4731,7 @@ void EncCu::xReuseCachedResult( CodingStructure *&tempCS, CodingStructure *&best
 #endif
 
 #if pre_ana
+pre_analysis pa;
 int getRPLIdxLDB(int poc)
 {
   if (poc < 18)

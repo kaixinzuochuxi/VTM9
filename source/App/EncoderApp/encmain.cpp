@@ -218,6 +218,13 @@ int main(int argc, char* argv[])
   {
     // read GOP
     bool keepLoop = true;
+    /////
+#if pre_ana
+    for (auto & encApp : pcEncApp)
+    {
+      encApp->pre_analyze();
+    }
+#endif
     while( keepLoop )
     {
       for( auto & encApp : pcEncApp )
