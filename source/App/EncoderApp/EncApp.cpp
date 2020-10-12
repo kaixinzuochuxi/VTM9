@@ -1280,10 +1280,11 @@ void EncApp::printChromaFormat()
 
 
 #if pre_ana
-int EncApp::CalRPLIdx(int POCCurr)
+int EncApp::CalRPLIdxLD(int POCCurr)
 {
   if (m_iGOPSize == 16)
   {
+    
     return 0;
   }
   else if (m_iGOPSize == 8)
@@ -1297,6 +1298,32 @@ int EncApp::CalRPLIdx(int POCCurr)
       return (POCCurr - 1) % 8;
     }
   }
+  return -1;
+}
+
+int EncApp::CalRPLIdxRA(int POCCurr)
+{
+  if (m_iGOPSize == 16)
+  {
+
+    int ip=m_cEncLib.getIntraPeriod();
+    int a[16] = { 5,4,6,3,8,  7,9,2,12,11,  13,10,15,14,16,  1 };
+
+    // I slice
+    if (POCCurr == 0 || POCCurr % ip == 0)
+    {
+      return 0;
+    }
+    else if (POCCurr%ip == 16 || POCCurr % ip == 8 || POCCurr % ip == 4 || POCCurr % ip == 2)
+    {
+      return (16 + a[POCCurr%16 - 1] - 1);
+    }
+    else
+    {
+      return (a[POCCurr%16 - 1] - 1);
+    }
+  }
+  
   return -1;
 }
 
@@ -1318,127 +1345,29 @@ void EncApp::pre_analyze()
   extern pre_analysis pa;
   if (m_iGOPSize == 16)
   {
+    int num_pre_ana = 0;
     if (m_cEncLib.m_iPOCLast == -1)
     {
 
-      int num_pre_ana = m_cEncLib.getIntraPeriod() + 1;
+      num_pre_ana = m_cEncLib.getIntraPeriod() + 1;
       if (m_cEncLib.getIntraPeriod() != 16)
       {
         num_pre_ana -= 16;
       }
       // start of the sequence
-    }
-    else if ((m_cEncLib.m_iPOCLast + 1) % m_cEncLib.getIntraPeriod() == 0)
-    {
-      // start of a new ip
-      int num_pre_ana = m_cEncLib.getIntraPeriod();
-    }
-  }
-  else if (m_iGOPSize == 8)
-  {
-    int num_pre_ana = 0;
-    if (m_cEncLib.m_iPOCLast == -1)
-    {
-
-      // start of the sequence
-      num_pre_ana = 32 + 1;
-
-      
       pa.frameh = m_iSourceHeight;
       pa.framew = m_iSourceWidth;
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      pa.m_size = num_pre_ana;
+      pa.init();
     }
-    else if ((m_cEncLib.m_iPOCLast ) % m_iGOPSize == 0)
+    else if ((m_cEncLib.m_iPOCLast + 16) % m_cEncLib.getIntraPeriod() == 0 && (m_cEncLib.getIntraPeriod() != 16 ||  (m_cEncLib.getIntraPeriod() == 16 && m_cEncLib.m_iPOCLast!=0) ))
     {
-      // start of a new GOP
-      num_pre_ana = 32;
+      // start of a new ip
+      num_pre_ana = m_cEncLib.getIntraPeriod();
     }
     if (num_pre_ana != 0)
     {
-      //pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
-
-      pa.m_size = num_pre_ana;
-      pa.init();
-      for (int fidx = 0; fidx < num_pre_ana; fidx++)
-      {
-        if (m_cEncLib.m_iPOCLast + fidx + 2 > m_cEncLib.getFramesToBeEncoded() || m_cVideoIOYuvInputFile.isEof())
-        {
-          break;
-        }
-        m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
-
-
-        if (pa.pre_ana_buf.size()< m_cEncLib.m_iPOCLast + 2 + fidx)
-        { 
-          Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
-          PelBuf * tmp = new PelBuf;
-          tmp->buf = tbuf;
-          tmp->stride = m_iSourceWidth;
-          tmp->width = m_iSourceWidth;
-          tmp->height = m_iSourceHeight;       
-          tmp->copyFrom(m_orgPic->bufs[0]);
-          pa.pre_ana_buf.push_back(tmp);
-        }
-        //printf("%llu\n", pa.pre_ana_buf.size());
-      }
-
-      for (int fidx = 0; fidx < num_pre_ana; fidx++)
-      //for (int fidx = 0; fidx < 8; fidx++)
-      {
-        if (m_cEncLib.m_iPOCLast + fidx + 2 > m_cEncLib.getFramesToBeEncoded() || m_cVideoIOYuvInputFile.isEof())
-        {
-          break;
-        }
-        int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
-        
-        
-        int rplidx = CalRPLIdx(curPOC);
-        //printf("rplidx:%d\n", rplidx);
-        
-        //if (curPOC != 0)
-        //{
-        //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
-        //}
-        
-        for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
-        {
-          
-          vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
-            if (curPOC != 0)
-            {
-            
-              dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[rplidx], m_RPLList1[rplidx]);
-            }
-          auto dIntra = pa.CalIntraSATD(0, ctuidx);
-          auto dIBC = pa.CalIBCSATD(0, ctuidx);
-          for (int cuidx = 0; cuidx < 4; cuidx++)
-          {
-            
-            pa.CUSATD[fidx][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
-            //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
-            int x = 0;
-          }
-          int x = 0;
-        }
-
-      }
-
-    }
-  }
-  ///// AI
-  else if (m_iGOPSize == 1)
-  {
-    int num_pre_ana = 16;
-    if (m_cEncLib.m_iPOCLast == -1)
-    {
-      extern pre_analysis pa;
-      pa.frameh = m_iSourceHeight;
-      pa.framew = m_iSourceWidth;
-      pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
-    }
-      pa.m_size = num_pre_ana;
-      
-      pa.init();
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
         if (m_cEncLib.m_iPOCLast + fidx + 2 > m_cEncLib.getFramesToBeEncoded() || m_cVideoIOYuvInputFile.isEof())
@@ -1459,36 +1388,247 @@ void EncApp::pre_analyze()
           tmp->copyFrom(m_orgPic->bufs[0]);
           pa.pre_ana_buf.push_back(tmp);
         }
-        printf("%llu\n", pa.pre_ana_buf.size());
-      }
 
+
+
+      }
+      vector<int> eoc;
+      // start to end of current GOP or IP
+      int lastEndPOC = m_cEncLib.m_iPOCLast;
+      int curEndPOC = (int)pa.pre_ana_buf.size();
+      int GOPsize = m_cEncLib.getGOPSize();
+      int GOPid = 0;
+      for (int eocidx = 0; eocidx < num_pre_ana; eocidx++)
+      {
+
+        if ( ((eocidx) % 16 == 0 && eocidx != 0 && num_pre_ana%2==0)
+          || ((eocidx-1) % 16 == 0 && eocidx != 1 && num_pre_ana % 2 == 1))
+        {
+          lastEndPOC += 16;
+          GOPid = 0;
+        }
+        if (lastEndPOC == -1 )
+        {
+          eoc.push_back(0);
+          lastEndPOC++;
+          continue;
+        }
+        else
+        {
+          for (; GOPid < GOPsize; GOPid++)
+          {
+            int curpoc = lastEndPOC + m_GOPList[GOPid].m_POC;
+            if (curpoc < curEndPOC)
+            {
+              eoc.push_back(curpoc);
+              GOPid++;
+              //printf("eocidx:%d\tGOPid:%d\tcurpoc:%d\n", eocidx, GOPid, curpoc);
+              break;
+            }
+            else
+            {
+              continue;
+            }
+          }
+        }
+        
+        //if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
+        //{
+        //  pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        //  pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        //  pa.CUSATD.back().resize(pa.TotalCTUNum);
+        //  int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+
+
+        //  int rplidx = CalRPLIdxRA(curPOC);
+        //  printf("curPOC:%d\trplidx:%d\n", curPOC, rplidx);
+
+
+
+        //  //for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+        //  //{
+
+        //  //  vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
+        //  //  if (curPOC != 0)
+        //  //  {
+
+        //  //    dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+        //  //  }
+        //  //  auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
+        //  //  auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
+        //  //  for (int cuidx = 0; cuidx < 4; cuidx++)
+        //  //  {
+
+        //  //    pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
+        //  //    //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
+        //  //    int x = 0;
+        //  //  }
+        //  //  int x = 0;
+        //  //}
+        //}
+
+      }
+      for (int i = 0; i < eoc.size(); i++)
+      {
+      
+        printf("%d,%d\n", i, eoc[i]);
+      }
+    }
+
+  }
+  else if (m_iGOPSize == 8)
+  {
+    int num_pre_ana = 0;
+    if (m_cEncLib.m_iPOCLast == -1)
+    {
+
+      // start of the sequence
+      num_pre_ana = 32 + 1;
+
+      
+      pa.frameh = m_iSourceHeight;
+      pa.framew = m_iSourceWidth;
+      pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      pa.m_size = num_pre_ana;
+      pa.init();
+    }
+    else if ((m_cEncLib.m_iPOCLast ) % m_iGOPSize == 0)
+    {
+      // start of a new GOP
+      num_pre_ana = 32;
+    }
+    if (num_pre_ana != 0)
+    {
+      //pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
+
+      
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
         if (m_cEncLib.m_iPOCLast + fidx + 2 > m_cEncLib.getFramesToBeEncoded() || m_cVideoIOYuvInputFile.isEof())
         {
           break;
         }
-        for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+        m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
+
+
+        if (pa.pre_ana_buf.size()< m_cEncLib.m_iPOCLast + 2 + fidx)
+        { 
+          Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
+          PelBuf * tmp = new PelBuf;
+          tmp->buf = tbuf;
+          tmp->stride = m_iSourceWidth;
+          tmp->width = m_iSourceWidth;
+          tmp->height = m_iSourceHeight;       
+          tmp->copyFrom(m_orgPic->bufs[0]);
+          pa.pre_ana_buf.push_back(tmp);
+        }
+
+        if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
         {
-          auto dIntra = pa.CalIntraSATD(0, ctuidx);
-          auto dIBC = pa.CalIBCSATD(0, ctuidx);
-          for (int cuidx = 0; cuidx < 4; cuidx++)
+          pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.CUSATD.back().resize(pa.TotalCTUNum);
+          int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+
+
+          int rplidx = CalRPLIdxLD(curPOC);
+          //printf("rplidx:%d\n", rplidx);
+
+          //if (curPOC != 0)
+          //{
+          //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+          //}
+
+          for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
           {
-            pa.CUSATD[fidx][ctuidx].push_back(min(dIntra[cuidx], dIBC[cuidx]));
+
+            vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
+            if (curPOC != 0)
+            {
+
+              dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+            }
+            auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
+            auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
+            for (int cuidx = 0; cuidx < 4; cuidx++)
+            {
+
+              pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
+              //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
+              int x = 0;
+            }
             int x = 0;
           }
-          int x = 0;
         }
+        printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
+        
       }
 
-
-      // test intra SATD
-      for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+      
+    }
+  }
+  ///// AI
+  else if (m_iGOPSize == 1)
+  {
+    int num_pre_ana = 16;
+    if (m_cEncLib.m_iPOCLast == -1)
+    {
+      extern pre_analysis pa;
+      pa.frameh = m_iSourceHeight;
+      pa.framew = m_iSourceWidth;
+      pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      pa.init();
+    }
+      pa.m_size = num_pre_ana;
+      
+      
+      for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
-        pa.CalIntraSATD(0, ctuidx);
-        auto t = pa.CalIBCSATD(0, ctuidx);
-        int x = 0;
+        
+        if (m_cEncLib.m_iPOCLast + fidx + 2 > m_cEncLib.getFramesToBeEncoded() || m_cVideoIOYuvInputFile.isEof())
+        {
+          break;
+        }
+        m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
+
+
+        if (pa.pre_ana_buf.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
+        {
+          Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
+          PelBuf * tmp = new PelBuf;
+          tmp->buf = tbuf;
+          tmp->stride = m_iSourceWidth;
+          tmp->width = m_iSourceWidth;
+          tmp->height = m_iSourceHeight;
+          tmp->copyFrom(m_orgPic->bufs[0]);
+          pa.pre_ana_buf.push_back(tmp);
+        }
+        //printf("%llu\n", pa.pre_ana_buf.size());
+
+        if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
+        {
+          int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+          pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.CUSATD.back().resize(pa.TotalCTUNum);
+          pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+          {
+            auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
+            auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
+            for (int cuidx = 0; cuidx < 4; cuidx++)
+            {
+              pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], dIBC[cuidx]));
+              int x = 0;
+            }
+            int x = 0;
+          }
+        }
+        printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
       }
+
+      
+
+
 
       //pa.CalIBCSATD(0);
       int xx = 0;
@@ -1504,7 +1644,8 @@ void EncApp::pre_analyze()
   }
   m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
 
-  pa.clearSATD();
+  //pa.clearSATD();
+  //printf("m_cEncLib.m_iPOCLast:%d\n", m_cEncLib.m_iPOCLast);
 }
 
 #endif

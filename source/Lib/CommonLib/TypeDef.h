@@ -53,6 +53,10 @@
 // self define macro
 #define pre_ana 1
 
+// RC
+#define RlambdaRC 1
+#define SATDRC 0
+
 
 
 //########### place macros to be removed in next cycle below this line ###############

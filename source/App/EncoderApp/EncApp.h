@@ -123,7 +123,8 @@ public:
   int   getBitDepth() const { return m_cEncLib.getBitDepth(CHANNEL_TYPE_LUMA); }
 
 #if pre_ana
-  int CalRPLIdx(int POCCurr);
+  int CalRPLIdxLD(int POCCurr);
+  int CalRPLIdxRA(int POCCurr);
   void pre_analyze();
 #endif
 };// END CLASS DEFINITION EncApp

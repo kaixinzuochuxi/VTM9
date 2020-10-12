@@ -346,15 +346,15 @@ public:
 
   void init()
   {
-    FrameSATD.resize(m_size);
-    CUSATD.resize(m_size);
+    //FrameSATD.resize(m_size);
+    //CUSATD.resize(m_size);
 
     int numx = framew / 128 + ((framew % 128) == 0 ? 0 : 1);
     int numy = frameh / 128 + ((frameh % 128) == 0 ? 0 : 1);
     TotalCTUNum = numx * numy;
     
-    for(int i=0;i< m_size;i++)
-      CUSATD[i].resize(TotalCTUNum);
+    /*for(int i=0;i< m_size;i++)
+      CUSATD[i].resize(TotalCTUNum);*/
 
 
     IBCRef[0][0][0] = -64;
@@ -374,7 +374,7 @@ public:
     IBCRef[2][0][0] = -64;
     IBCRef[2][0][1] = 0;
     IBCRef[2][1][0] = 0;
-    IBCRef[2][1][1] = 64;
+    IBCRef[2][1][1] = -64;
     IBCRef[2][2][0] = 64;
     IBCRef[2][2][1] = -64;
 
@@ -515,12 +515,18 @@ public:
             {
               if (x + IBCRef[IBCIdx][refidx][0] >= 0 && y + IBCRef[IBCIdx][refidx][1] >= 0)
               {
-                Area RefCU = Area(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], min(CTUsize, framew - x), min(CTUsize, frameh - y));
+                int refx = x + IBCRef[IBCIdx][refidx][0];
+                int refy = y + IBCRef[IBCIdx][refidx][1];
+                int refw= min(CTUsize, framew - refx);
+                int refh= min(CTUsize, frameh - refy);
+                if (refw >= w && refh >= h)
+                {
+                  Area RefCU = Area(refx, refy, refw, refh);
 
 
-                tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
-                dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD));
-
+                  tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
+                  dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD));
+                }
                 
               }
             }
@@ -591,16 +597,16 @@ public:
           int refpoc = fidx - deltaRefPics0[refidx];
           //if(refpoc>=0)
           //{
-            dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_SSE));
+            dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
           //}
           //else
           //{
             //dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
           //}
-            if (IBCIdx == 0 && x == 0 && y == 0 && refidx==0)
-            {
-              printf("%d->%d:  %llu\n", fidx, refpoc,dist);
-            }
+            //if (IBCIdx == 0 && x == 0 && y == 0 && refidx==0)
+            //{
+            //  printf("%d->%d:  %llu\n", fidx, refpoc,dist);
+            //}
         }
         // for L1 if not LDP
         for (int refidx = 0; refidx < numRefPics1; refidx++)
@@ -641,60 +647,7 @@ public:
     return d;
   }
 
-  //int CalRPLIdx(int POCCurr)
-  //{
-  //  
-  //  int m_iGOPSize = m_pclib->getGOPSize();
-  //  int fullListNum = m_iGOPSize;
-  //  int partialListNum = m_pclib->getRPLCandidateSize(0) - m_iGOPSize;
-  //  int extraNum = fullListNum;
 
-  //  int rplPeriod = m_pclib->getIntraPeriod();
-  //  if (rplPeriod < 0)  //Need to check if it is low delay or RA but with no RAP
-  //  {
-  //    //if (slice->getSPS()->getRPLList0()->getReferencePictureList(1)->getRefPicIdentifier(0) * slice->getSPS()->getRPLList1()->getReferencePictureList(1)->getRefPicIdentifier(0) < 0)
-  //    if (m_pclib->getSPS(0)->getRPLList0()->getReferencePictureList(1)->getRefPicIdentifier(0) * m_pclib->getSPS(0)->getRPLList1()->getReferencePictureList(1)->getRefPicIdentifier(0) < 0)
-  //    {
-  //      rplPeriod = m_iGOPSize * 2;
-  //      
-  //    }
-  //  }
-
-  //  if (rplPeriod < 0)
-  //  {
-  //    // first 18 frames in seq
-  //    if (POCCurr < (2 * m_iGOPSize + 2))
-  //    {
-  //      //int candidateIdx = (POCCurr + m_iGOPSize - 1 >= fullListNum + partialListNum) ? GOPid : POCCurr + m_iGOPSize - 1;
-  //      //return candidateIdx;
-  //      return POCCurr+7;
-  //    }
-  //    else
-  //    {
-  //      return ((POCCurr%m_iGOPSize == 0) ? m_iGOPSize - 1 : POCCurr % m_iGOPSize - 1);
-  //      
-  //    }
-  //    extraNum = fullListNum + partialListNum;
-  //  }
-  //  for (; extraNum < fullListNum + partialListNum; extraNum++)
-  //  {
-  //    if (rplPeriod > 0)
-  //    {
-  //      int POCIndex = POCCurr % rplPeriod;
-  //      if (POCIndex == 0)
-  //      {
-  //        POCIndex = rplPeriod;
-  //      }
-  //      if (POCIndex == m_pclib->getRPLEntry(1,extraNum).m_POC)
-  //      {
-  //        
-  //        return extraNum;
-  //      }
-  //    }
-  //  }
-
-  //  
-  //}
 };
 
 
