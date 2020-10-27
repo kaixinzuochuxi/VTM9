@@ -1301,6 +1301,61 @@ int EncApp::CalRPLIdxLD(int POCCurr)
   return -1;
 }
 
+void EncApp::genEOC(int num_pre_ana)
+{
+  extern pre_analysis pa;
+  vector<int> eoc;
+  vector<int> rpllist;
+  // start to end of current GOP or IP
+  int lastEndPOC = m_cEncLib.m_iPOCLast;
+  int curEndPOC = (int)pa.pre_ana_buf.size();
+  int GOPsize = m_cEncLib.getGOPSize();
+  int GOPid = 0;
+  for (int eocidx = 0; eocidx < num_pre_ana; eocidx++)
+  {
+
+    if (((eocidx) % 16 == 0 && eocidx != 0 && num_pre_ana % 2 == 0)
+      || ((eocidx - 1) % 16 == 0 && eocidx != 1 && num_pre_ana % 2 == 1))
+    {
+      lastEndPOC += 16;
+      GOPid = 0;
+    }
+    if (lastEndPOC == -1)
+    {
+      eoc.push_back(0);
+      rpllist.push_back(0);
+      lastEndPOC++;
+      continue;
+    }
+    else
+    {
+      for (; GOPid < GOPsize; GOPid++)
+      {
+        int curpoc = lastEndPOC + m_GOPList[GOPid].m_POC;
+        if (curpoc < curEndPOC)
+        {
+          eoc.push_back(curpoc);
+          rpllist.push_back(GOPid);
+          
+          printf("eocidx:%d\tGOPid:%d\tcurpoc:%d\n", eocidx, GOPid, curpoc);
+          GOPid++;
+          break;
+        }
+        else
+        {
+          continue;
+        }
+      }
+    }
+  }
+  pa.encodingorder.insert(pa.encodingorder.end(), eoc.begin(), eoc.end());
+  //for (int i = 0; i < pa.encodingorder.size(); i++)
+  //{
+
+  //  printf("%d,%d\n", i, pa.encodingorder[i]);
+  //}
+}
+
 int EncApp::CalRPLIdxRA(int POCCurr)
 {
   if (m_iGOPSize == 16)
@@ -1327,6 +1382,81 @@ int EncApp::CalRPLIdxRA(int POCCurr)
   return -1;
 }
 
+void EncApp::genSATDRA(int start,int end)
+{
+  extern pre_analysis pa;
+  pa.updateCUSATD();
+  int ridx = -1;
+  int rpllist[16] = { 4,3,5,2,7,6,8,1,11,10,12,9,14,13,15, };
+  //for (int eocidx = end - 1; eocidx >= start; eocidx--)
+  for (int eocidx = start; eocidx < end; eocidx++)
+  {
+    // compute Rplidx
+    if ((end - start) % 2 == 1)
+    {
+    
+    if (eocidx == start)
+    {
+      ridx = 0;
+    }
+    else if (eocidx >= start + 1 && eocidx < start + 5)
+    {
+      ridx = eocidx - start+15;
+    }
+    else
+    {
+      ridx = (eocidx - start-1) % 16;
+    }
+    }
+    else
+    {
+      if (eocidx == start)
+      {
+        ridx = 0;
+      }
+      else if (eocidx >= start + 16 && eocidx < start + 20)
+      {
+        ridx = eocidx - start;
+      }
+      else
+      {
+        ridx = (eocidx - start) % 16;
+      }
+    }
+    
+    //printf("poc:%d\tIdx:%d\n", pa.encodingorder[eocidx], ridx);
+
+    int curPOC = pa.encodingorder[eocidx];
+    if (curPOC != 0)
+    {
+
+      auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[ridx], m_RPLList1[ridx]);
+    }
+    for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+    {
+
+      vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
+      if (curPOC != 0)
+      {
+
+        //dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[ridx], m_RPLList1[ridx]);
+      }
+      auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
+      auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
+      for (int cuidx = 0; cuidx < 4; cuidx++)
+      {
+
+        pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
+        //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
+        int x = 0;
+      }
+      int x = 0;
+    }
+
+  }
+
+
+}
 
 void EncApp::pre_analyze()
 {
@@ -1343,7 +1473,9 @@ void EncApp::pre_analyze()
   //m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
 
   extern pre_analysis pa;
-  if (m_iGOPSize == 16)
+  int startpos;
+  int endpos;
+  if (m_iIntraPeriod != 1 && m_iIntraPeriod !=-1)
   {
     int num_pre_ana = 0;
     if (m_cEncLib.m_iPOCLast == -1)
@@ -1354,18 +1486,28 @@ void EncApp::pre_analyze()
       {
         num_pre_ana -= 16;
       }
+      num_pre_ana = min(m_cEncLib.getFramesToBeEncoded(), num_pre_ana);
       // start of the sequence
+      pa.hieStruct = 2;
+      
       pa.frameh = m_iSourceHeight;
       pa.framew = m_iSourceWidth;
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
       pa.m_size = num_pre_ana;
       pa.init();
+      pa.swEndIdx = pa.curidx + num_pre_ana;
     }
     else if ((m_cEncLib.m_iPOCLast + 16) % m_cEncLib.getIntraPeriod() == 0 && (m_cEncLib.getIntraPeriod() != 16 ||  (m_cEncLib.getIntraPeriod() == 16 && m_cEncLib.m_iPOCLast!=0) ))
     {
       // start of a new ip
       num_pre_ana = m_cEncLib.getIntraPeriod();
+      num_pre_ana = min(m_cEncLib.getFramesToBeEncoded()- m_cEncLib.m_iPOCLast-1, num_pre_ana);
+      pa.m_size = num_pre_ana;
+      pa.swEndIdx = pa.curidx + num_pre_ana;
     }
+    startpos = m_cEncLib.m_iPOCLast + 1;
+    endpos = startpos + num_pre_ana;
+
     if (num_pre_ana != 0)
     {
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
@@ -1392,47 +1534,64 @@ void EncApp::pre_analyze()
 
 
       }
-      vector<int> eoc;
-      // start to end of current GOP or IP
-      int lastEndPOC = m_cEncLib.m_iPOCLast;
-      int curEndPOC = (int)pa.pre_ana_buf.size();
-      int GOPsize = m_cEncLib.getGOPSize();
-      int GOPid = 0;
-      for (int eocidx = 0; eocidx < num_pre_ana; eocidx++)
-      {
+      //vector<int> eoc;
+      //// start to end of current GOP or IP
+      //int lastEndPOC = m_cEncLib.m_iPOCLast;
+      //int curEndPOC = (int)pa.pre_ana_buf.size();
+      //int GOPsize = m_cEncLib.getGOPSize();
+      //int GOPid = 0;
+      //for (int eocidx = 0; eocidx < num_pre_ana; eocidx++)
+      //{
 
-        if ( ((eocidx) % 16 == 0 && eocidx != 0 && num_pre_ana%2==0)
-          || ((eocidx-1) % 16 == 0 && eocidx != 1 && num_pre_ana % 2 == 1))
-        {
-          lastEndPOC += 16;
-          GOPid = 0;
-        }
-        if (lastEndPOC == -1 )
-        {
-          eoc.push_back(0);
-          lastEndPOC++;
-          continue;
-        }
-        else
-        {
-          for (; GOPid < GOPsize; GOPid++)
-          {
-            int curpoc = lastEndPOC + m_GOPList[GOPid].m_POC;
-            if (curpoc < curEndPOC)
-            {
-              eoc.push_back(curpoc);
-              GOPid++;
-              //printf("eocidx:%d\tGOPid:%d\tcurpoc:%d\n", eocidx, GOPid, curpoc);
-              break;
-            }
-            else
-            {
-              continue;
-            }
-          }
-        }
-        
-        //if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
+      //  if ( ((eocidx) % 16 == 0 && eocidx != 0 && num_pre_ana%2==0)
+      //    || ((eocidx-1) % 16 == 0 && eocidx != 1 && num_pre_ana % 2 == 1))
+      //  {
+      //    lastEndPOC += 16;
+      //    GOPid = 0;
+      //  }
+      //  if (lastEndPOC == -1 )
+      //  {
+      //    eoc.push_back(0);
+      //    lastEndPOC++;
+      //    continue;
+      //  }
+      //  else
+      //  {
+      //    for (; GOPid < GOPsize; GOPid++)
+      //    {
+      //      int curpoc = lastEndPOC + m_GOPList[GOPid].m_POC;
+      //      if (curpoc < curEndPOC)
+      //      {
+      //        eoc.push_back(curpoc);
+      //        GOPid++;
+      //        //printf("eocidx:%d\tGOPid:%d\tcurpoc:%d\n", eocidx, GOPid, curpoc);
+      //        break;
+      //      }
+      //      else
+      //      {
+      //        continue;
+      //      }
+      //    }
+      //  }
+      //  
+      //  
+
+      //}
+      //
+      //pa.encodingorder.insert(pa.encodingorder.end(), eoc.begin(), eoc.end());
+      //for (int i = 0; i < pa.encodingorder.size(); i++)
+      //{
+
+      //  printf("%d,%d\n", i, pa.encodingorder[i]);
+      int startpos = (int)pa.encodingorder.size();
+      genEOC(num_pre_ana);
+      int endpos = (int)pa.encodingorder.size();;
+      //printf("start:%d\tend:%d\n", startpos, endpos);
+      //genSATDRA(startpos, endpos);
+      }
+    }
+
+    //if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
         //{
         //  pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
         //  pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
@@ -1467,16 +1626,8 @@ void EncApp::pre_analyze()
         //  //}
         //}
 
-      }
-      for (int i = 0; i < eoc.size(); i++)
-      {
-      
-        printf("%d,%d\n", i, eoc[i]);
-      }
-    }
-
-  }
-  else if (m_iGOPSize == 8)
+  
+  else if (m_iIntraPeriod == -1)
   {
     int num_pre_ana = 0;
     if (m_cEncLib.m_iPOCLast == -1)
@@ -1485,22 +1636,31 @@ void EncApp::pre_analyze()
       // start of the sequence
       num_pre_ana = 32 + 1;
 
-      
+      pa.hieStruct = 1;
       pa.frameh = m_iSourceHeight;
       pa.framew = m_iSourceWidth;
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      num_pre_ana = min(m_cEncLib.getFramesToBeEncoded(), num_pre_ana);
       pa.m_size = num_pre_ana;
       pa.init();
+      pa.swEndIdx = pa.curidx + num_pre_ana;
     }
     else if ((m_cEncLib.m_iPOCLast ) % m_iGOPSize == 0)
     {
       // start of a new GOP
       num_pre_ana = 32;
+      
+      num_pre_ana = min(m_cEncLib.getFramesToBeEncoded() - m_cEncLib.m_iPOCLast - 1, num_pre_ana);
+      pa.m_size = num_pre_ana;
+      pa.swEndIdx = pa.curidx + num_pre_ana;
     }
+    startpos = m_cEncLib.m_iPOCLast + 1;
+    endpos = startpos + num_pre_ana;
+
     if (num_pre_ana != 0)
     {
       //pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
-
+      
       
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
@@ -1560,7 +1720,7 @@ void EncApp::pre_analyze()
             int x = 0;
           }
         }
-        printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
+        //printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
         
       }
 
@@ -1568,20 +1728,25 @@ void EncApp::pre_analyze()
     }
   }
   ///// AI
-  else if (m_iGOPSize == 1)
+  else if (m_iIntraPeriod == 1)
   {
     int num_pre_ana = 16;
     if (m_cEncLib.m_iPOCLast == -1)
     {
       extern pre_analysis pa;
+      pa.hieStruct = 0;
       pa.frameh = m_iSourceHeight;
       pa.framew = m_iSourceWidth;
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
       pa.init();
     }
-      pa.m_size = num_pre_ana;
+    
+    num_pre_ana = min(m_cEncLib.getFramesToBeEncoded() - m_cEncLib.m_iPOCLast - 1, num_pre_ana);
+    pa.m_size = num_pre_ana;
+    pa.swEndIdx = pa.curidx + num_pre_ana;
       
-      
+    startpos = m_cEncLib.m_iPOCLast + 1;
+    endpos = startpos + num_pre_ana;
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
         
@@ -1623,7 +1788,7 @@ void EncApp::pre_analyze()
             int x = 0;
           }
         }
-        printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
+        //printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
       }
 
       
@@ -1643,7 +1808,7 @@ void EncApp::pre_analyze()
 
   }
   m_cVideoIOYuvInputFile.m_cHandle.seekg(cur_pos);
-
+  pa.updateFrameSATD(startpos,endpos);
   //pa.clearSATD();
   //printf("m_cEncLib.m_iPOCLast:%d\n", m_cEncLib.m_iPOCLast);
 }

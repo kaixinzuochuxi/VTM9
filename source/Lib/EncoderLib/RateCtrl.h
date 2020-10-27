@@ -372,9 +372,11 @@ private:
 #endif
 };
 
-#endif
 
-#if SATDRC
+
+#elif SATDRC
+#include "EncoderLib/EncCu.h"
+#include <numeric>
 const int g_RCInvalidQPValue = -999;
 const int g_RCSmoothWindowSize = 40;
 const int g_RCMaxPicListSize = 32;
@@ -503,6 +505,10 @@ private:
   int m_adaptiveBit;
   double m_lastLambda;
   int m_bitDepth;
+
+public:
+  int totalSWbits;
+  int SWbitsLeft;
 };
 
 class EncRCGOP
@@ -645,6 +651,10 @@ private:
   double m_picLambda;
   double m_picMSE;
   int m_validPixelsInPic;
+#if SATDRC
+  public:
+  int poc;
+#endif
 };
 
 class RateCtrl

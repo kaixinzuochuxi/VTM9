@@ -316,25 +316,32 @@ protected:
 
 
 #if pre_ana
+const int g_GOPSizeRA = 16;
+const int g_GOPSizeLD = 8;
 int getRPLIdxLDB(int poc);
 int getRPLIdxRA(int poc);
 class pre_analysis
 {
 public:
-  int m_size;
-  vector<PelBuf*> pre_ana_buf;
-  vector<vector<vector<uint64_t>>> CUSATD;
-  vector<uint64_t> FrameSATD;
-  int curidx;
+  
+  
   int CTUsize = 64;
   int framew;
   int frameh;
   RdCost *m_pcRdCost;
-  //EncCu *m_pcEncCu;
-  //EncLib *m_pclib;
   int TotalCTUNum;
-  //RPLEntry RefList0[MAX_GOP];
+  int hieStruct; // 0:ai,1:LD,2:RA
+
+  int m_size;
+  int curidx;
+  int swEndIdx;
+  vector<PelBuf*> pre_ana_buf;
+  vector<vector<vector<uint64_t>>> CUSATD;
+  vector<uint64_t> FrameSATD;
   int IBCRef[4][3][2];
+  vector<int> encodingorder;
+
+
 
   pre_analysis() {
     m_size = 0; curidx = 0;
@@ -346,15 +353,13 @@ public:
 
   void init()
   {
-    //FrameSATD.resize(m_size);
-    //CUSATD.resize(m_size);
+    
 
     int numx = framew / 128 + ((framew % 128) == 0 ? 0 : 1);
     int numy = frameh / 128 + ((frameh % 128) == 0 ? 0 : 1);
     TotalCTUNum = numx * numy;
     
-    /*for(int i=0;i< m_size;i++)
-      CUSATD[i].resize(TotalCTUNum);*/
+    
 
 
     IBCRef[0][0][0] = -64;
@@ -384,6 +389,14 @@ public:
     IBCRef[3][1][1] = -64;
     IBCRef[3][2][0] = -64;
     IBCRef[3][2][1] = 0;
+  }
+  void updateCUSATD()
+  {
+    int cursize = (int)CUSATD.size();
+    //FrameSATD.resize(cursize + m_size);
+    CUSATD.resize(cursize + m_size);
+    for (int i = 0; i < m_size; i++)
+      CUSATD[i + cursize].resize(TotalCTUNum);
   }
 
   Position getCTUPos(int ctuidx)
@@ -419,6 +432,19 @@ public:
     }
   }
 
+  template <class T>
+  T Sum(const T x) {
+    return x;
+  }
+
+  template <class T>
+  T Sum(const std::vector<T> &v) {
+    decltype(Sum(v[0])) sum = 0;
+    for (const auto &x : v)
+      sum += Sum(x);
+    return sum;
+  }
+
 
   void destroy()
   {
@@ -431,6 +457,21 @@ public:
       pre_ana_buf.pop_back();
     }
 
+  }
+
+  void updateFrameSATD(int startpos,int endpos)
+  {
+    for(int idx=startpos;idx<endpos;idx++)
+    {
+      for (int i = 0; i < CUSATD[idx].size(); i++)
+      {
+        for (int j = 0; j < CUSATD[idx][i].size(); j++)
+        {
+          FrameSATD[idx] += CUSATD[idx][i][j];
+        }
+      }
+      
+    }
   }
 
   void clearSATD()
@@ -451,31 +492,31 @@ public:
     int yctu = CTUPos.y;
     int IBCIdx = 0;
     vector<uint64_t> d = { 0,0,0,0 };
-        for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
-        {
-          for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
-          {
-            int w = min(CTUsize, framew - x);
-            int h = min(CTUsize, frameh - y);
-            Area CurCU = Area(x, y, w, h);
-            if (x == xctu && y == yctu)
-              IBCIdx = 0;
-            else if (x == xctu + CTUsize && y == yctu)
-              IBCIdx = 1;
-            else if (x == xctu && y == yctu + CTUsize)
-              IBCIdx = 2;
-            else if (x == xctu + CTUsize && y == yctu + CTUsize)
-              IBCIdx = 3;
-            PelBuf tmp(tbuf, w, h);
-            tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
-            dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
-            d[IBCIdx] = dist;
-            //CUSATD[fidx][ctuidx].push_back(dist);
-            //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
-          }
-        }
-
-        xFree(tbuf);
+    for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+    {
+      for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+      {
+        int w = min(CTUsize, framew - x);
+        int h = min(CTUsize, frameh - y);
+        Area CurCU = Area(x, y, w, h);
+        if (x == xctu && y == yctu)
+          IBCIdx = 0;
+        else if (x == xctu + CTUsize && y == yctu)
+          IBCIdx = 1;
+        else if (x == xctu && y == yctu + CTUsize)
+          IBCIdx = 2;
+        else if (x == xctu + CTUsize && y == yctu + CTUsize)
+          IBCIdx = 3;
+        PelBuf tmp(tbuf, w, h);
+        tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
+        dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
+        d[IBCIdx] = dist;
+        //CUSATD[fidx][ctuidx].push_back(dist);
+        //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
+      }
+    }
+    
+    xFree(tbuf);
     return d;
   }
 
@@ -561,17 +602,17 @@ public:
     int numRefPics1 = rpl2.m_numRefPicsActive;
     int deltaRefPics1[MAX_NUM_REF_PICS] = { 0 };
     memcpy(deltaRefPics1, rpl2.m_deltaRefPics, numRefPics1 * sizeof(int));
-    /*printf("L0:  ");
-    for (int i = 0; i < numRefPics0; i++)
-    {
-      printf("%d  ", fidx- deltaRefPics0[i]);
-    }
-    printf("L1:  ");
-    for (int i = 0; i < numRefPics1; i++)
-    {
-      printf("%d  ", fidx - deltaRefPics1[i]);
-    }
-    printf("\n");*/
+    //printf("POC:%d\tL0:  ", fidx);
+    //for (int i = 0; i < numRefPics0; i++)
+    //{
+    //  printf("%d  ", fidx- deltaRefPics0[i]);
+    //}
+    //printf("L1:  ");
+    //for (int i = 0; i < numRefPics1; i++)
+    //{
+    //  printf("%d  ", fidx - deltaRefPics1[i]);
+    //}
+    //printf("\n");
     
     for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
     {

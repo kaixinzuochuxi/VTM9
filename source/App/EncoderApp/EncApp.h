@@ -126,6 +126,8 @@ public:
   int CalRPLIdxLD(int POCCurr);
   int CalRPLIdxRA(int POCCurr);
   void pre_analyze();
+  void genEOC(int num_pre_ana);
+  void genSATDRA(int start, int end);
 #endif
 };// END CLASS DEFINITION EncApp
 

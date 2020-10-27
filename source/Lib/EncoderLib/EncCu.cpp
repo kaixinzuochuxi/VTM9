@@ -358,11 +358,17 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
     cs.useSubStructure(*bestCS, partitioner.chType, CS::getArea(*bestCS, area, partitioner.chType),
                        copyUnsplitCTUSignals, false, false, copyUnsplitCTUSignals, true);
   }
-
+#if RlambdaRC
   if (m_pcEncCfg->getUseRateCtrl())
   {
     (m_pcRateCtrl->getRCPic()->getLCU(ctuRsAddr)).m_actualMSE = (double)bestCS->dist / (double)m_pcRateCtrl->getRCPic()->getLCU(ctuRsAddr).m_numberOfPixel;
   }
+#elif SATDRC
+  if (m_pcEncCfg->getUseRateCtrl())
+  {
+    (m_pcRateCtrl->getRCPic()->getLCU(ctuRsAddr)).m_actualMSE = (double)bestCS->dist / (double)m_pcRateCtrl->getRCPic()->getLCU(ctuRsAddr).m_numberOfPixel;
+  }
+#endif
   // reset context states and uninit context pointer
   m_CABACEstimator->getCtx() = m_CurrCtx->start;
   m_CurrCtx                  = 0;

@@ -2198,7 +2198,7 @@ void EncLib::selectReferencePictureList(Slice* slice, int POCCurr, int GOPid, in
   slice->setRPL0(rpl0);
   slice->setRPL1(rpl1);
 
-  //printf("idx:%d\t", slice->getRPL0idx());
+  //printf("rplidx:%d\t", slice->getRPL0idx());
 }
 
 

@@ -1662,6 +1662,7 @@ void EncGOP::xPicInitRateControl(int &estimatedBits, int gopId, double &lambda, 
   {
     return;
   }
+#if RlambdaRC
   int frameLevel = m_pcRateCtrl->getRCSeq()->getGOPID2Level( gopId );
   if ( pic->slices[0]->isIRAP() )
   {
@@ -1769,6 +1770,125 @@ void EncGOP::xPicInitRateControl(int &estimatedBits, int gopId, double &lambda, 
   m_pcRateCtrl->getRCPic()->setPicEstQP( sliceQP );
 
   m_pcSliceEncoder->resetQP( pic, sliceQP, lambda );
+
+#elif SATDRC
+int frameLevel = m_pcRateCtrl->getRCSeq()->getGOPID2Level(gopId);
+if (pic->slices[0]->isIRAP())
+{
+  frameLevel = 0;
+}
+m_pcRateCtrl->initRCPic(frameLevel);
+m_pcRateCtrl->getRCPic()->poc = pic->getPOC();
+estimatedBits = m_pcRateCtrl->getRCPic()->getTargetBits();
+
+#if U0132_TARGET_BITS_SATURATION
+if (m_pcRateCtrl->getCpbSaturationEnabled() && frameLevel != 0)
+{
+  int estimatedCpbFullness = m_pcRateCtrl->getCpbState() + m_pcRateCtrl->getBufferingRate();
+
+  // prevent overflow
+  if (estimatedCpbFullness - estimatedBits > (int)(m_pcRateCtrl->getCpbSize()*0.9f))
+  {
+    estimatedBits = estimatedCpbFullness - (int)(m_pcRateCtrl->getCpbSize()*0.9f);
+  }
+
+  estimatedCpbFullness -= m_pcRateCtrl->getBufferingRate();
+  // prevent underflow
+#if V0078_ADAPTIVE_LOWER_BOUND
+  if (estimatedCpbFullness - estimatedBits < m_pcRateCtrl->getRCPic()->getLowerBound())
+  {
+    estimatedBits = std::max(200, estimatedCpbFullness - m_pcRateCtrl->getRCPic()->getLowerBound());
+  }
+#else
+  if (estimatedCpbFullness - estimatedBits < (int)(m_pcRateCtrl->getCpbSize()*0.1f))
+  {
+    estimatedBits = std::max(200, estimatedCpbFullness - (int)(m_pcRateCtrl->getCpbSize()*0.1f));
+  }
+#endif
+
+  m_pcRateCtrl->getRCPic()->setTargetBits(estimatedBits);
+}
+#endif
+
+int sliceQP = m_pcCfg->getInitialQP();
+if ((slice->getPOC() == 0 && m_pcCfg->getInitialQP() > 0) || (frameLevel == 0 && m_pcCfg->getForceIntraQP())) // QP is specified
+{
+  int    NumberBFrames = (m_pcCfg->getGOPSize() - 1);
+  double dLambda_scale = 1.0 - Clip3(0.0, 0.5, 0.05*(double)NumberBFrames);
+  double dQPFactor = 0.57*dLambda_scale;
+  int    SHIFT_QP = 12;
+  int bitdepth_luma_qp_scale = 6 * (slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA) - 8
+    - DISTORTION_PRECISION_ADJUSTMENT(slice->getSPS()->getBitDepth(CHANNEL_TYPE_LUMA)));
+  double qp_temp = (double)sliceQP + bitdepth_luma_qp_scale - SHIFT_QP;
+  lambda = dQPFactor * pow(2.0, qp_temp / 3.0);
+}
+else if (frameLevel == 0)   // intra case, but use the model
+{
+  m_pcSliceEncoder->calCostPictureI(pic);
+  if (m_pcCfg->getIntraPeriod() != 1)   // do not refine allocated bits for all intra case
+  {
+#if RIrefine
+    int bits = m_pcRateCtrl->getRCPic()->getTargetBits();
+#else
+    int bits = m_pcRateCtrl->getRCSeq()->getLeftAverageBits();
+#endif
+    bits = m_pcRateCtrl->getRCPic()->getRefineBitsForIntra(bits);
+
+#if U0132_TARGET_BITS_SATURATION
+    if (m_pcRateCtrl->getCpbSaturationEnabled())
+    {
+      int estimatedCpbFullness = m_pcRateCtrl->getCpbState() + m_pcRateCtrl->getBufferingRate();
+
+      // prevent overflow
+      if (estimatedCpbFullness - bits > (int)(m_pcRateCtrl->getCpbSize()*0.9f))
+      {
+        bits = estimatedCpbFullness - (int)(m_pcRateCtrl->getCpbSize()*0.9f);
+      }
+
+      estimatedCpbFullness -= m_pcRateCtrl->getBufferingRate();
+      // prevent underflow
+#if V0078_ADAPTIVE_LOWER_BOUND
+      if (estimatedCpbFullness - bits < m_pcRateCtrl->getRCPic()->getLowerBound())
+      {
+        bits = estimatedCpbFullness - m_pcRateCtrl->getRCPic()->getLowerBound();
+      }
+#else
+      if (estimatedCpbFullness - bits < (int)(m_pcRateCtrl->getCpbSize()*0.1f))
+      {
+        bits = estimatedCpbFullness - (int)(m_pcRateCtrl->getCpbSize()*0.1f);
+      }
+#endif
+    }
+#endif
+
+    if (bits < 200)
+    {
+      bits = 200;
+    }
+    m_pcRateCtrl->getRCPic()->setTargetBits(bits);
+  }
+
+  list<EncRCPic*> listPreviousPicture = m_pcRateCtrl->getPicList();
+  m_pcRateCtrl->getRCPic()->getLCUInitTargetBits();
+  lambda = m_pcRateCtrl->getRCPic()->estimatePicLambda(listPreviousPicture, slice->isIRAP());
+  sliceQP = m_pcRateCtrl->getRCPic()->estimatePicQP(lambda, listPreviousPicture);
+}
+else    // normal case
+{
+  list<EncRCPic*> listPreviousPicture = m_pcRateCtrl->getPicList();
+  lambda = m_pcRateCtrl->getRCPic()->estimatePicLambda(listPreviousPicture, slice->isIRAP());
+  sliceQP = m_pcRateCtrl->getRCPic()->estimatePicQP(lambda, listPreviousPicture);
+}
+
+sliceQP = Clip3(-slice->getSPS()->getQpBDOffset(CHANNEL_TYPE_LUMA), MAX_QP, sliceQP);
+m_pcRateCtrl->getRCPic()->setPicEstQP(sliceQP);
+
+m_pcSliceEncoder->resetQP(pic, sliceQP, lambda);
+
+#endif
+#if printRCvar
+printf("Frame-level R:%d\tlambda:%.2f\tQP:%d\n", m_pcRateCtrl->getRCPic()->getTargetBits(),lambda, sliceQP);
+#endif
 }
 
 void EncGOP::xPicInitLMCS(Picture *pic, PicHeader *picHeader, Slice *slice)
@@ -3324,6 +3444,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
 
       if ( m_pcCfg->getUseRateCtrl() )
       {
+#if RlambdaRC
         double avgQP     = m_pcRateCtrl->getRCPic()->calAverageQP();
         double avgLambda = m_pcRateCtrl->getRCPic()->calAverageLambda();
         if ( avgLambda < 0.0 )
@@ -3350,6 +3471,42 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
           msg( NOTICE, " [CPB %6d bits]", m_pcRateCtrl->getCpbState() );
         }
   #endif
+#elif SATDRC
+        double avgQP = m_pcRateCtrl->getRCPic()->calAverageQP();
+        double avgLambda = m_pcRateCtrl->getRCPic()->calAverageLambda();
+        if (avgLambda < 0.0)
+        {
+          avgLambda = lambda;
+        }
+
+        m_pcRateCtrl->getRCPic()->updateAfterPicture(actualHeadBits, actualTotalBits, avgQP, avgLambda, pcSlice->isIRAP());
+        m_pcRateCtrl->getRCPic()->addToPictureLsit(m_pcRateCtrl->getPicList());
+
+        m_pcRateCtrl->getRCSeq()->updateAfterPic(actualTotalBits);
+#if RIUpdateWithActual
+        
+          m_pcRateCtrl->getRCGOP()->updateAfterPicture(actualTotalBits);
+        
+          
+        
+#else
+        if (!pcSlice->isIRAP())
+        {
+          m_pcRateCtrl->getRCGOP()->updateAfterPicture(actualTotalBits);
+        }
+        else    // for intra picture, the estimated bits are used to update the current status in the GOP
+        {
+          m_pcRateCtrl->getRCGOP()->updateAfterPicture(estimatedBits);
+        }
+#endif
+#if U0132_TARGET_BITS_SATURATION
+        if (m_pcRateCtrl->getCpbSaturationEnabled())
+        {
+          m_pcRateCtrl->updateCpbState(actualTotalBits);
+          msg(NOTICE, " [CPB %6d bits]", m_pcRateCtrl->getCpbState());
+        }
+#endif
+#endif
       }
       xCreateFrameFieldInfoSEI( leadingSeiMessages, pcSlice, isField );
       xCreatePictureTimingSEI( m_pcCfg->getEfficientFieldIRAPEnabled() ? effFieldIRAPMap.GetIRAPGOPid() : 0, leadingSeiMessages, nestedSeiMessages, duInfoSeiMessages, pcSlice, isField, duData );

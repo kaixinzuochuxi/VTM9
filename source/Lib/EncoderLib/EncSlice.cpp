@@ -1290,7 +1290,27 @@ void EncSlice::calCostPictureI(Picture* picture)
   const SPS     &sps = *(slice->getSPS());
   const int      shift = sps.getBitDepth(CHANNEL_TYPE_LUMA) - 8;
   const int      offset = (shift>0) ? (1 << (shift - 1)) : 0;
+#if weight_cu_satd
+  extern pre_analysis pa;
+  int curpoc = picture->getPOC();
+  for (uint32_t ctuIdx = 0; ctuIdx < picture->m_ctuNums; ctuIdx++)
+  {
+    (m_pcRateCtrl->getRCPic()->getLCU(ctuIdx)).m_costIntra = 0;
+    for (int subcuidx = 0; subcuidx < pa.CUSATD[curpoc][ctuIdx].size(); subcuidx++)
+    {
+      (m_pcRateCtrl->getRCPic()->getLCU(ctuIdx)).m_costIntra += pa.CUSATD[curpoc][ctuIdx][subcuidx];
+    }
+    /*const int height = std::min(pcv.maxCUHeight, pcv.lumaHeight - pos.y);
+    const int width = std::min(pcv.maxCUWidth, pcv.lumaWidth - pos.x);
+    const CompArea blk(COMPONENT_Y, pcv.chrFormat, pos, Size(width, height));
+    int sumHad = m_pcCuEncoder->updateCtuDataISlice(picture->getOrigBuf(blk));
 
+    (m_pcRateCtrl->getRCPic()->getLCU(ctuIdx)).m_costIntra = (sumHad + offset) >> shift;
+    sumHadPicture += (m_pcRateCtrl->getRCPic()->getLCU(ctuIdx)).m_costIntra;*/
+  }
+  //m_pcRateCtrl->getRCPic()->setTotalIntraCost(sumHadPicture);
+  m_pcRateCtrl->getRCPic()->setTotalIntraCost((double)pa.FrameSATD[curpoc]);
+#else
   for (uint32_t ctuIdx = 0; ctuIdx < picture->m_ctuNums; ctuIdx++)
   {
     Position pos((ctuIdx % pcv.widthInCtus) * pcv.maxCUWidth, (ctuIdx / pcv.widthInCtus) * pcv.maxCUHeight);
@@ -1304,6 +1324,8 @@ void EncSlice::calCostPictureI(Picture* picture)
     sumHadPicture += (m_pcRateCtrl->getRCPic()->getLCU(ctuIdx)).m_costIntra;
   }
   m_pcRateCtrl->getRCPic()->setTotalIntraCost(sumHadPicture);
+#endif
+  
 }
 
 /** \param pcPic   picture class
@@ -1620,6 +1642,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     const double oldLambda = pRdCost->getLambda();
     if ( pCfg->getUseRateCtrl() )
     {
+#if RlambdaRC
       int estQP        = pcSlice->getSliceQp();
       double estLambda = -1.0;
       double bpp       = -1.0;
@@ -1659,6 +1682,47 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       }
 
       pRateCtrl->setRCQP( estQP );
+#elif SATDRC
+      int estQP = pcSlice->getSliceQp();
+      double estLambda = -1.0;
+      double bpp = -1.0;
+
+      if ((pcPic->slices[0]->isIRAP() && pCfg->getForceIntraQP()) || !pCfg->getLCULevelRC())
+      {
+        estQP = pcSlice->getSliceQp();
+      }
+      else
+      {
+        bpp = pRateCtrl->getRCPic()->getLCUTargetBpp(pcSlice->isIRAP());
+        if (pcPic->slices[0]->isIRAP())
+        {
+          estLambda = pRateCtrl->getRCPic()->getLCUEstLambdaAndQP(bpp, pcSlice->getSliceQp(), &estQP);
+        }
+        else
+        {
+          estLambda = pRateCtrl->getRCPic()->getLCUEstLambda(bpp);
+          estQP = pRateCtrl->getRCPic()->getLCUEstQP(estLambda, pcSlice->getSliceQp());
+        }
+
+        estQP = Clip3(-pcSlice->getSPS()->getQpBDOffset(CHANNEL_TYPE_LUMA), MAX_QP, estQP);
+
+        pRdCost->setLambda(estLambda, pcSlice->getSPS()->getBitDepths());
+#if WCG_EXT
+        pRdCost->saveUnadjustedLambda();
+#endif
+
+#if RDOQ_CHROMA_LAMBDA
+        const double lambdaArray[MAX_NUM_COMPONENT] = { estLambda / m_pcRdCost->getDistortionWeight(COMPONENT_Y),
+                                                       estLambda / m_pcRdCost->getDistortionWeight(COMPONENT_Cb),
+                                                       estLambda / m_pcRdCost->getDistortionWeight(COMPONENT_Cr) };
+        pTrQuant->setLambdas(lambdaArray);
+#else
+        pTrQuant->setLambda(estLambda);
+#endif
+      }
+
+      pRateCtrl->setRCQP(estQP);
+#endif
     }
 #if ENABLE_QPA
     else if (pCfg->getUsePerceptQPA() && pcSlice->getPPS()->getUseDQP())
@@ -1738,6 +1802,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
     actualBits    -= (int)m_uiPicTotalBits;
     if ( pCfg->getUseRateCtrl() )
     {
+#if RlambdaRC
       int actualQP        = g_RCInvalidQPValue;
       double actualLambda = pRdCost->getLambda();
       int numberOfEffectivePixels    = 0;
@@ -1770,6 +1835,40 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       pRdCost->setLambda(oldLambda, pcSlice->getSPS()->getBitDepths());
       pRateCtrl->getRCPic()->updateAfterCTU(pRateCtrl->getRCPic()->getLCUCoded(), actualBits, actualQP, actualLambda, skipRatio,
         pcSlice->isIRAP() ? 0 : pCfg->getLCULevelRC());
+#elif SATDRC
+      int actualQP = g_RCInvalidQPValue;
+      double actualLambda = pRdCost->getLambda();
+      int numberOfEffectivePixels = 0;
+
+      int numberOfSkipPixel = 0;
+      for (auto &cu : cs.traverseCUs(ctuArea, CH_L))
+      {
+        numberOfSkipPixel += cu.skip*cu.lumaSize().area();
+      }
+
+      for (auto &cu : cs.traverseCUs(ctuArea, CH_L))
+      {
+        if (!cu.skip || cu.rootCbf)
+        {
+          numberOfEffectivePixels += cu.lumaSize().area();
+          break;
+        }
+    }
+      double skipRatio = (double)numberOfSkipPixel / ctuArea.lumaSize().area();
+      CodingUnit* cu = cs.getCU(ctuArea.lumaPos(), CH_L);
+
+      if (numberOfEffectivePixels == 0)
+      {
+        actualQP = g_RCInvalidQPValue;
+      }
+      else
+      {
+        actualQP = cu->qp;
+      }
+      pRdCost->setLambda(oldLambda, pcSlice->getSPS()->getBitDepths());
+      pRateCtrl->getRCPic()->updateAfterCTU(pRateCtrl->getRCPic()->getLCUCoded(), actualBits, actualQP, actualLambda, skipRatio,
+        pcSlice->isIRAP() ? 0 : pCfg->getLCULevelRC());
+#endif
     }
 #if ENABLE_QPA && !ENABLE_QPA_SUB_CTU
     else if (pCfg->getUsePerceptQPA() && pcSlice->getPPS()->getUseDQP())

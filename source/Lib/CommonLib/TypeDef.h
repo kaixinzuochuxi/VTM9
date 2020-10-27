@@ -54,8 +54,21 @@
 #define pre_ana 1
 
 // RC
-#define RlambdaRC 1
-#define SATDRC 0
+#define RlambdaRC 0
+#define SATDRC 1
+
+#define printRCvar 1
+
+#if SATDRC
+#define SWBA 1
+#define RIrefine 0
+#define RIUpdateWithActual 0
+#define updateBAwithClipLambda 0
+#define weight_frame_satd 0
+#define weight_cu_satd 1
+//#undef pre_ana
+//#define pre_ana 1
+#endif
 
 
 
