@@ -310,6 +310,14 @@ CodingUnit& CodingUnit::operator=( const CodingUnit& other )
   treeType          = other.treeType;
   modeType          = other.modeType;
   modeTypeSeries    = other.modeTypeSeries;
+
+#if build_cu_tree && meansatd
+  satdrec = other.satdrec;
+#if predfromori
+  satdori = other.satdori;
+#endif
+
+#endif
   return *this;
 }
 
@@ -363,6 +371,13 @@ void CodingUnit::initData()
   treeType          = TREE_D;
   modeType          = MODE_TYPE_ALL;
   modeTypeSeries    = 0;
+
+#if build_cu_tree && meansatd
+  satdrec = 0;
+#if predfromori
+  satdori = 0;
+#endif
+#endif
 }
 
 const bool CodingUnit::isSepTree() const
@@ -561,6 +576,26 @@ void PredictionUnit::initData()
   }
   ciipFlag = false;
   mmvdEncOptMode = 0;
+#if build_cu_tree
+  intradist = UINT32_MAX;
+  interdist = UINT32_MAX;
+  D_currecwoilf_curori_refrec = UINT32_MAX;
+  //cost = MAX_DOUBLE;
+  interbits = 0;
+  intrabits = 0;
+  orisigma = 0;
+  refsigma0 = 0;
+  refsigma1 = 0;
+
+#if predfromori
+  interdistori = UINT32_MAX;
+  interbitsori = 0;
+  D_currecwoilf_curori_refori = UINT32_MAX;
+  reforisigma0 = 0;
+  reforisigma1 = 0;
+#endif
+#endif
+
 }
 
 PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
@@ -571,7 +606,12 @@ PredictionUnit& PredictionUnit::operator=(const IntraPredictionData& predData)
   }
   mipTransposedFlag = predData.mipTransposedFlag;
   multiRefIdx = predData.multiRefIdx;
-
+#if build_cu_tree
+  intradist = predData.intradist;
+  //cost = predData.cost;
+  //interdist = predData.interdist;
+  intrabits = predData.intrabits;
+#endif
   return *this;
 }
 
@@ -611,6 +651,18 @@ PredictionUnit& PredictionUnit::operator=(const InterPredictionData& predData)
     }
   }
   ciipFlag = predData.ciipFlag;
+#if build_cu_tree
+  //intradist = predData.intradist;
+  interdist = predData.interdist;
+  D_currecwoilf_curori_refrec = predData.D_currecwoilf_curori_refrec;
+  // cost = predData.cost;
+  interbits = predData.interbits;
+#if predfromori
+  interdistori = predData.interdistori;
+  interbitsori = predData.interbitsori;
+  D_currecwoilf_curori_refori = predData.D_currecwoilf_curori_refori;
+#endif
+#endif
   return *this;
 }
 
@@ -657,6 +709,19 @@ PredictionUnit& PredictionUnit::operator=( const PredictionUnit& other )
     }
   }
   ciipFlag = other.ciipFlag;
+#if build_cu_tree
+  intradist = other.intradist;
+  interdist = other.interdist;
+  D_currecwoilf_curori_refrec = other.D_currecwoilf_curori_refrec;
+  //cost = other.cost;
+  interbits = other.interbits;
+  intrabits = other.intrabits;
+#if predfromori
+  interdistori = other.interdistori;
+  interbitsori = other.interbitsori;
+  D_currecwoilf_curori_refori = other.D_currecwoilf_curori_refori;
+#endif
+#endif
   return *this;
 }
 

@@ -1634,7 +1634,7 @@ void EncApp::pre_analyze()
     {
 
       // start of the sequence
-      num_pre_ana = 32 + 1;
+      num_pre_ana = g_presizeLD + 1;
 
       pa.hieStruct = 1;
       pa.frameh = m_iSourceHeight;
@@ -1648,8 +1648,8 @@ void EncApp::pre_analyze()
     else if ((m_cEncLib.m_iPOCLast ) % m_iGOPSize == 0)
     {
       // start of a new GOP
-      num_pre_ana = 32;
-      
+      //num_pre_ana = min(g_presizeLD, m_cEncLib.getFramesToBeEncoded()-(int)pa.FrameSATD.size());
+      num_pre_ana = g_presizeLD;
       num_pre_ana = min(m_cEncLib.getFramesToBeEncoded() - m_cEncLib.m_iPOCLast - 1, num_pre_ana);
       pa.m_size = num_pre_ana;
       pa.swEndIdx = pa.curidx + num_pre_ana;
@@ -1698,7 +1698,25 @@ void EncApp::pre_analyze()
           //{
           //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
           //}
-
+#if yang2019content
+          pa.cuflag.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.cuflag.back().resize(pa.TotalCTUNum);
+          //printf("pa.cuflag:%d\n", (int)pa.cuflag.size());
+          if (curPOC == 0)
+          {
+            pa.fd.push_back(0);
+            
+          }
+          else if (curPOC <= pa.fd.size())
+          {
+            pa.fd.push_back(pa.CalFD(curPOC, m_RPLList0[rplidx], m_RPLList1[rplidx]));
+          }
+          else
+          {
+            pa.fd[curPOC] = pa.CalFD(curPOC, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+          }
+          //printf("pa.fd:%d\n", (int)pa.fd.size());
+#endif
           for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
           {
 

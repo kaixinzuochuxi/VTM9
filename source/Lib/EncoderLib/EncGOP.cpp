@@ -4187,6 +4187,14 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
     const double fRefValue = (double)maxval * maxval * size;
     dPSNR[comp]       = uiSSDtemp ? 10.0 * log10(fRefValue / (double)uiSSDtemp) : 999.99;
     MSEyuvframe[comp] = (double)uiSSDtemp / size;
+#if yang2019content
+    extern pre_analysis pa;
+    if(comp==0)
+    {
+      pa.pastD.push_back(uiSSDtemp);
+    }
+    
+#endif
 #if WCG_WPSNR
     const double uiSSDtempWeighted = xFindDistortionPlaneWPSNR(recPB, orgPB, 0, org.get(COMPONENT_Y), compID, format);
     if (useLumaWPSNR)

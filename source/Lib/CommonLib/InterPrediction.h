@@ -193,6 +193,35 @@ public:
   bool isLumaBvValid(const int ctuSize, const int xCb, const int yCb, const int width, const int height, const int xBv, const int yBv);
 
   bool xPredInterBlkRPR( const std::pair<int, int>& scalingRatio, const PPS& pps, const CompArea &blk, const Picture* refPic, const Mv& mv, Pel* dst, const int dstStride, const bool bi, const bool wrapRef, const ClpRng& clpRng, const int filterIndex, const bool useAltHpelIf = false );
+
+#if predfromori
+  void xPredInterBiori(PredictionUnit& pu, PelUnitBuf &pcYuvPred, const bool luma = true, const bool chroma = true, PelUnitBuf* yuvPredTmp = NULL);
+  void xPredInterBlkori(const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv& _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng
+    , const bool& bioApplied
+    , bool isIBC
+    , const std::pair<int, int> scalingRatio = SCALE_1X
+    , SizeType dmvrWidth = 0
+    , SizeType dmvrHeight = 0
+    , bool bilinearMC = false
+    , Pel *srcPadBuf = NULL
+    , int32_t srcPadStride = 0
+  );
+  void xPredAffineBlk(const ComponentID& compID, const PredictionUnit& pu, const Picture* refPic, const Mv* _mv, PelUnitBuf& dstPic, const bool& bi, const ClpRng& clpRng, const bool genChromaMv = false, const std::pair<int, int> scalingRatio = SCALE_1X);
+  void    motionCompensationori(PredictionUnit &pu, PelUnitBuf& predBuf, const RefPicList &eRefPicList = REF_PIC_LIST_X
+    , const bool luma = true, const bool chroma = true
+    , PelUnitBuf* predBufWOBIO = NULL
+  );
+  void    motionCompensationori(PredictionUnit &pu, const RefPicList &eRefPicList = REF_PIC_LIST_X
+    , const bool luma = true, const bool chroma = true
+  );
+  void    motionCompensationori(CodingUnit &cu, const RefPicList &eRefPicList = REF_PIC_LIST_X
+    , const bool luma = true, const bool chroma = true
+  );
+
+  void    motionCompensationGeoori(CodingUnit &cu, MergeCtx &GeoMrgCtx);
+
+#endif
+
 };
 
 //! \}

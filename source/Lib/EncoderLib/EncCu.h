@@ -56,7 +56,11 @@
 #include "RateCtrl.h"
 #include "EncModeCtrl.h"
 
-
+#if yang2019content
+//#include "CommonLib/TrQuant.cpp"
+#include "CommonLib/TrQuant_EMT.h"
+#include <numeric>
+#endif
 //! \ingroup EncoderLib
 //! \{
 
@@ -318,8 +322,11 @@ protected:
 #if pre_ana
 const int g_GOPSizeRA = 16;
 const int g_GOPSizeLD = 8;
+const int g_presizeLD = 80;
 int getRPLIdxLDB(int poc);
 int getRPLIdxRA(int poc);
+
+
 class pre_analysis
 {
 public:
@@ -331,6 +338,7 @@ public:
   RdCost *m_pcRdCost;
   int TotalCTUNum;
   int hieStruct; // 0:ai,1:LD,2:RA
+  DFunc costfun = DF_HAD;
 
   int m_size;
   int curidx;
@@ -341,6 +349,300 @@ public:
   int IBCRef[4][3][2];
   vector<int> encodingorder;
 
+#if yang2019content
+  vector<int> scenechange;
+  vector<uint64_t> fd;
+  vector<uint64_t> pastD;
+  enum CTUtype
+  {
+    TCTU=0,
+    SICTU=1,
+    NICTU=2,
+    TOTAL=3,
+  };
+  //0,text,1,SI,2,NI
+  vector < vector<int>> cuflag;
+  bool inPic(int x, int y, int xoffset, int yoffset)
+  {
+    if (x + xoffset >= 0 && x + xoffset < framew && y + yoffset >= 0 && y + yoffset < frameh)
+      return true;
+    else
+      return false;
+  }
+  
+  void transfrom(const CPelBuf &resi, CoeffBuf &dstCoeff, const int width, const int height);
+//  {
+//    int bitDepth = 10;
+//    int maxLog2TrDynamicRange = 15;
+//    const int      TRANSFORM_MATRIX_SHIFT = g_transformMatrixShift[TRANSFORM_FORWARD];
+//    const uint32_t transformWidthIndex = floorLog2(width) - 1;  // nLog2WidthMinus1, since transform start from 2-point
+//    const uint32_t transformHeightIndex = floorLog2(height) - 1;  // nLog2HeightMinus1, since transform start from 2-point
+//
+//    int trTypeHor = DCT2;
+//    int trTypeVer = DCT2;
+//    int  skipWidth = (trTypeHor != DCT2 && width == 32) ? 16 : width > JVET_C0024_ZERO_OUT_TH ? width - JVET_C0024_ZERO_OUT_TH : 0;
+//    int  skipHeight = (trTypeVer != DCT2 && height == 32) ? 16 : height > JVET_C0024_ZERO_OUT_TH ? height - JVET_C0024_ZERO_OUT_TH : 0;
+//    if (1)
+//    {
+//      if ((width == 4 && height > 4) || (width > 4 && height == 4))
+//      {
+//        skipWidth = width - 4;
+//        skipHeight = height - 4;
+//      }
+//      else if ((width >= 8 && height >= 8))
+//      {
+//        skipWidth = width - 8;
+//        skipHeight = height - 8;
+//      }
+//    }
+//
+//#if RExt__DECODER_DEBUG_TOOL_STATISTICS
+//    if (trTypeHor != DCT2)
+//    {
+//      CodingStatistics::IncrementStatisticTool(CodingStatisticsClassType{ STATS__TOOL_EMT, uint32_t(width), uint32_t(height), compID });
+//    }
+//#endif
+//
+//    ALIGN_DATA(MEMORY_ALIGN_DEF_SIZE, TCoeff block[MAX_TB_SIZEY * MAX_TB_SIZEY]);
+//
+//    const Pel *resiBuf = resi.buf;
+//    const int  resiStride = resi.stride;
+//
+//    for (int y = 0; y < height; y++)
+//    {
+//      for (int x = 0; x < width; x++)
+//      {
+//        block[(y * width) + x] = resiBuf[(y * resiStride) + x];
+//      }
+//    }
+//
+//    if (width > 1 && height > 1) // 2-D transform
+//    {
+//      const int      shift_1st = ((floorLog2(width)) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;
+//      const int      shift_2nd = (floorLog2(height)) + TRANSFORM_MATRIX_SHIFT + COM16_C806_TRANS_PREC;
+//      CHECK(shift_1st < 0, "Negative shift");
+//      CHECK(shift_2nd < 0, "Negative shift");
+//      TCoeff *tmp = (TCoeff *)alloca(width * height * sizeof(TCoeff));
+//
+//      fastFwdTrans1[trTypeHor][transformWidthIndex](block, tmp, shift_1st, height, 0, skipWidth);
+//      fastFwdTrans1[trTypeVer][transformHeightIndex](tmp, dstCoeff.buf, shift_2nd, width, skipWidth, skipHeight);
+//    }
+//    else if (height == 1) //1-D horizontal transform
+//    {
+//      const int      shift = ((floorLog2(width)) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;
+//      CHECK(shift < 0, "Negative shift");
+//      CHECKD((transformWidthIndex < 0), "There is a problem with the width.");
+//      fastFwdTrans1[trTypeHor][transformWidthIndex](block, dstCoeff.buf, shift, 1, 0, skipWidth);
+//    }
+//    else //if (iWidth == 1) //1-D vertical transform
+//    {
+//      int shift = ((floorLog2(height)) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;
+//      CHECK(shift < 0, "Negative shift");
+//      CHECKD((transformHeightIndex < 0), "There is a problem with the height.");
+//      fastFwdTrans1[trTypeVer][transformHeightIndex](block, dstCoeff.buf, shift, 1, 0, skipHeight);
+//    }
+// 
+//  }
+  
+  uint64_t  CalFD(int fidx, RPLEntry rpl1, RPLEntry rpl2)
+  {
+
+
+
+    
+    vector<uint64_t> d = { 0,0,0,0 };
+    // obtain ref list
+    int numRefPics0 = rpl1.m_numRefPicsActive;
+    int deltaRefPics0[MAX_NUM_REF_PICS] = { 0 };
+    memcpy(deltaRefPics0, rpl1.m_deltaRefPics, numRefPics0 * sizeof(int));
+
+    int numRefPics1 = rpl2.m_numRefPicsActive;
+    int deltaRefPics1[MAX_NUM_REF_PICS] = { 0 };
+    memcpy(deltaRefPics1, rpl2.m_deltaRefPics, numRefPics1 * sizeof(int));
+    //printf("POC:%d\tL0:  ", fidx);
+    //for (int i = 0; i < numRefPics0; i++)
+    //{
+    //  printf("%d  ", fidx- deltaRefPics0[i]);
+    //}
+    //printf("L1:  ");
+    //for (int i = 0; i < numRefPics1; i++)
+    //{
+    //  printf("%d  ", fidx - deltaRefPics1[i]);
+    //}
+    //printf("\n");
+
+    
+        uint64_t dist = MAX_INT;
+        uint64_t dist0 = 0;
+        uint64_t dist1 = 0;
+
+
+        int refidx = 0;
+        // for L0
+        if (numRefPics0 > 0)
+        {
+          
+          int refpoc = fidx - deltaRefPics0[refidx];
+
+          dist0 = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(0,0,framew,frameh), pre_ana_buf[refpoc]->subBuf(0, 0, framew, frameh), 10, COMPONENT_Y, costfun);
+        }
+        
+        // for L1 if not LDP
+        if (numRefPics1>0)
+        {
+          int refpoc = fidx - deltaRefPics1[refidx];
+
+          dist1 = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(0, 0, framew, frameh), pre_ana_buf[refpoc]->subBuf(0, 0, framew, frameh), 10, COMPONENT_Y, costfun);
+          dist = dist0 / 2 + dist1 / 2;
+        }
+        else
+        {
+          dist = dist0;
+        }
+        
+
+        
+
+
+        return dist;
+
+
+
+
+  }
+
+  
+  int check_scenechange(int fidx)
+  {
+    if (fd[fidx] / framew/frameh > 2500 * 16)
+    {
+      return 1;
+    }
+    if (pastD.size() != 0)
+    {
+      uint64_t avgD = 0;
+      for (uint64_t x : pastD)
+      {
+        avgD += x;
+      }
+      
+      if (fd[fidx] > 10 * avgD)
+      {
+        pastD.clear();
+        return 1;
+      }
+
+    }
+    //printf("pastD.size():%d\n", (int)pastD.size());
+    return 0;
+  }
+
+  void CTU_classification(int fidx,int ctuidx)
+  {
+    
+
+    
+    Position CTUPos = getCTUPos(ctuidx);
+    int xctu = CTUPos.x;
+    int yctu = CTUPos.y;
+    int IBCIdx = 0;
+    
+    ////////// T-CTU
+    int w = min(128, framew - xctu);
+    int h = min(128, frameh - yctu);
+
+    //double a1 = 0;
+    double a = 0;
+    for (int tx = xctu; tx < xctu + w; tx++)
+    {
+      for (int ty = yctu; ty < yctu + h; ty++)
+      {
+        double ta1 = 0;
+        double ta2 = 0;
+        int a1idx = 0;
+        int a2idx = 0;
+        if (inPic(tx, ty, -1, -1))
+        {
+          ta1 += pow(pre_ana_buf[fidx]->at(tx, ty) - pre_ana_buf[fidx]->at(tx - 1, ty - 1), 2);
+          a1idx++;
+        }
+        if (inPic(tx, ty, 1, -1))
+        {
+          ta1 += pow(pre_ana_buf[fidx]->at(tx, ty) - pre_ana_buf[fidx]->at(tx + 1, ty - 1), 2);
+          a1idx++;
+        }
+        if (inPic(tx, ty, -1, 1))
+        {
+          ta1 += pow(pre_ana_buf[fidx]->at(tx, ty) - pre_ana_buf[fidx]->at(tx - 1, ty + 1), 2);
+          a1idx++;
+        }
+        if (inPic(tx, ty, 1, 1))
+        {
+          ta1 += pow(pre_ana_buf[fidx]->at(tx, ty) - pre_ana_buf[fidx]->at(tx + 1, ty + 1), 2);
+          a1idx++;
+        }
+        if (a1idx != 0)
+        {
+          ta1 = sqrt(ta1) / a1idx;
+        }
+        if (inPic(tx, ty, -1, -1) && inPic(tx, ty, 1, 1))
+        {
+          ta2 += pow(pre_ana_buf[fidx]->at(tx - 1, ty - 1) - pre_ana_buf[fidx]->at(tx + 1, ty + 1), 2);
+          a2idx++;
+        }
+        if (inPic(tx, ty, 1, -1) && inPic(tx, ty, -1, 1))
+        {
+          ta2 += pow(pre_ana_buf[fidx]->at(tx + 1, ty - 1) - pre_ana_buf[fidx]->at(tx - 1, ty + 1), 2);
+          a2idx++;
+        }
+        if (a2idx != 0)
+        {
+          ta2 = sqrt(ta2) / a2idx;
+        }
+
+        a = a + 0.5*ta1 + 0.5*ta2;
+      }
+    }
+    a = a / w / h;
+    if (a > 35)
+    {
+      cuflag[fidx][ctuidx] = TCTU;
+      return;
+    }
+    for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+    {
+      for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+      {
+
+        
+        
+        //////////
+        
+        int w1 = min(CTUsize, framew - x);
+        int h1 = min(CTUsize, frameh - y);
+        TCoeff* tbuf = (TCoeff*)xMalloc(TCoeff, w1*h1);
+        
+        if (x == xctu && y == yctu)
+          IBCIdx = 0;
+        else if (x == xctu + CTUsize && y == yctu)
+          IBCIdx = 1;
+        else if (x == xctu && y == yctu + CTUsize)
+          IBCIdx = 2;
+        else if (x == xctu + CTUsize && y == yctu + CTUsize)
+          IBCIdx = 3;
+        CoeffBuf tmp(tbuf, w1, h1);
+        transfrom(pre_ana_buf[fidx]->subBuf(x, y, w1, h1), tmp, w1, h1);
+        //mp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
+        //dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, costfun);
+        
+        xFree(tbuf);
+      }
+    }
+
+    
+ 
+  }
+#endif
 
 
   pre_analysis() {
@@ -509,7 +811,7 @@ public:
           IBCIdx = 3;
         PelBuf tmp(tbuf, w, h);
         tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
-        dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
+        dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, costfun);
         d[IBCIdx] = dist;
         //CUSATD[fidx][ctuidx].push_back(dist);
         //auto dist = RdCost::getDistPart(pre_ana_buf[idx]->subBuf(x, y, CTUsize, CTUsize), tmp, 10, COMPONENT_Y, DF_SSE);
@@ -558,15 +860,17 @@ public:
               {
                 int refx = x + IBCRef[IBCIdx][refidx][0];
                 int refy = y + IBCRef[IBCIdx][refidx][1];
-                int refw= min(CTUsize, framew - refx);
-                int refh= min(CTUsize, frameh - refy);
+                int refw= min(min(CTUsize, framew - refx), w);
+                int refh= min(min(CTUsize, frameh - refy),h);
                 if (refw >= w && refh >= h)
                 {
                   Area RefCU = Area(refx, refy, refw, refh);
 
 
-                  tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
-                  dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD));
+                  //tmp.copyFrom(pre_ana_buf[fidx]->subBuf(x + IBCRef[IBCIdx][refidx][0], y + IBCRef[IBCIdx][refidx][1], w, h));
+                  //dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, costfun));
+                  tmp.copyFrom(pre_ana_buf[fidx]->subBuf(refx, refy, refw, refh));
+                  dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, refw, refh), tmp, 10, COMPONENT_Y, costfun));
                 }
                 
               }
@@ -638,11 +942,11 @@ public:
           int refpoc = fidx - deltaRefPics0[refidx];
           //if(refpoc>=0)
           //{
-            dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
+            dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun));
           //}
           //else
           //{
-            //dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
+            //dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun));
           //}
             //if (IBCIdx == 0 && x == 0 && y == 0 && refidx==0)
             //{
@@ -654,7 +958,7 @@ public:
         {
           int refpoc = fidx - deltaRefPics1[refidx];
 
-          dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD));
+          dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun));
 
         }
         // for combine if not LDP}
@@ -664,7 +968,8 @@ public:
           int refpoc1 = fidx - deltaRefPics1[0];
           if (refpoc0 != refpoc1)
           {
-            Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+            //Pel* tbuf = (Pel*)xMalloc(Pel, CTUsize*CTUsize);
+            Pel* tbuf = (Pel*)xMalloc(Pel, w*h);
             PelBuf tmp(tbuf, w, h);
             int BD = 10;
             ClpRng t=ClpRng();

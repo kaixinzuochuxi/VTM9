@@ -60,6 +60,12 @@ enum PictureType
   PIC_RECON_WRAP,
   PIC_ORIGINAL_INPUT,
   PIC_TRUE_ORIGINAL_INPUT,
+#if predfromori 
+  PIC_PREDFROMORI,
+  PIC_RECOFROMORI,
+  PIC_RESIFROMORI,
+  PIC_ORIRESIFROMORI,
+#endif
   NUM_PIC_TYPES
 };
 extern XUCache g_globalUnitCache;
@@ -207,8 +213,14 @@ public:
   void storePrevPLT(PLTBuf& predictor);
 private:
 
+#if build_cu_tree
+  public:
   // needed for TU encoding
   bool m_isTuEnc;
+  private:
+#else
+  bool m_isTuEnc;
+#endif
 
   unsigned *m_cuIdx   [MAX_NUM_CHANNEL_TYPE];
   unsigned *m_puIdx   [MAX_NUM_CHANNEL_TYPE];
@@ -229,11 +241,33 @@ private:
   PelStorage m_resi;
   PelStorage m_reco;
   PelStorage m_orgr;
+#if predfromori
+  public:
+    PelStorage m_predfromori;
+    PelStorage m_recofromori;
+    PelStorage m_resifromori;
+    PelStorage m_oriresifromori;
+#endif
 
   TCoeff *m_coeffs [ MAX_NUM_COMPONENT ];
   Pel    *m_pcmbuf [ MAX_NUM_COMPONENT ];
   bool   *m_runType[ MAX_NUM_CHANNEL_TYPE ];
   int     m_offsets[ MAX_NUM_COMPONENT ];
+#if printresirec
+  TCoeff *m_resiwoq[MAX_NUM_COMPONENT];
+  TCoeff *m_resiwq[MAX_NUM_COMPONENT];
+  Pel *m_spresiwoq[MAX_NUM_TBLOCKS];
+  Pel *m_spresiwq[MAX_NUM_TBLOCKS];
+
+#endif
+#if printresiori
+  TCoeff *m_resiwoqori[MAX_NUM_COMPONENT];
+  TCoeff *m_resiwqori[MAX_NUM_COMPONENT];
+  Pel *m_spresiwoqori[MAX_NUM_TBLOCKS];
+  Pel *m_spresiwqori[MAX_NUM_TBLOCKS];
+
+#endif
+
 
   MotionInfo *m_motionBuf;
 
@@ -318,11 +352,20 @@ public:
   const CPelUnitBuf   getRecoBuf()                           const { return m_reco; }
 
 private:
+#if predfromori || printresirec
+public:
+  PelBuf       getBuf(const CompArea &blk, const PictureType &type);
+  const CPelBuf       getBuf(const CompArea &blk, const PictureType &type) const;
+  PelUnitBuf   getBuf(const UnitArea &unit, const PictureType &type);
+  const CPelUnitBuf   getBuf(const UnitArea &unit, const PictureType &type) const;
 
-  inline        PelBuf       getBuf(const CompArea &blk,  const PictureType &type);
-  inline const CPelBuf       getBuf(const CompArea &blk,  const PictureType &type) const;
+#else // predfromori
+
+  inline        PelBuf       getBuf(const CompArea &blk, const PictureType &type);
+  inline const CPelBuf       getBuf(const CompArea &blk, const PictureType &type) const;
   inline        PelUnitBuf   getBuf(const UnitArea &unit, const PictureType &type);
   inline const CPelUnitBuf   getBuf(const UnitArea &unit, const PictureType &type) const;
+#endif
 };
 
 

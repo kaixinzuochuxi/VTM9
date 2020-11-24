@@ -2410,7 +2410,8 @@ void EncRCGOP::create(EncRCSeq* encRCSeq, int numPic)
     for (int gopidx = 0; gopidx < encRCSeq->getGOPSize(); gopidx++)
     {
       
-      lambdaRatio[gopidx] = lambdaRatio[gopidx] * pa.FrameSATD[pa.curidx + gopidx]/ avgsatd;
+      //lambdaRatio[gopidx] = lambdaRatio[gopidx] * pa.FrameSATD[pa.curidx + gopidx]/ avgsatd;
+      lambdaRatio[gopidx] = lambdaRatio[gopidx] / pa.FrameSATD[pa.curidx + gopidx] * avgsatd;
     }
     pa.curidx += encRCSeq->getGOPSize();
 #endif
@@ -2518,8 +2519,11 @@ int EncRCGOP::xEstGOPTargetBits(EncRCSeq* encRCSeq, int GOPSize)
   int realInfluencePicture = min(pa.m_size, encRCSeq->getFramesLeft());
   int averageTargetBitsPerPic = (int)(encRCSeq->getTargetBits() / encRCSeq->getTotalFrames());
   int currentTargetBitsPerPic = (int)((encRCSeq->getBitsLeft() - averageTargetBitsPerPic * (encRCSeq->getFramesLeft() - realInfluencePicture)) / realInfluencePicture);
-  int paTargetBits = currentTargetBitsPerPic * pa.m_size;
+  //int paTargetBits = currentTargetBitsPerPic * pa.m_size;
+  //int paTargetBits = currentTargetBitsPerPic * realInfluencePicture;
+  int paTargetBits = (int)((encRCSeq->getBitsLeft() - averageTargetBitsPerPic * (encRCSeq->getFramesLeft() - realInfluencePicture)));
   int targetBits = 0;
+  printf("realInfluencePicture:%d\taverageTargetBitsPerPic:%d\tcurrentTargetBitsPerPic:%d\tpaTargetBits:%d\t", realInfluencePicture, averageTargetBitsPerPic,currentTargetBitsPerPic, paTargetBits);
   if (pa.hieStruct == 0)
   {
     uint64_t totalSATD = 0;
@@ -2531,35 +2535,40 @@ int EncRCGOP::xEstGOPTargetBits(EncRCSeq* encRCSeq, int GOPSize)
   }
   else if (pa.hieStruct == 1)
   {
-    if (pa.curidx == 0)
-    {
-      uint64_t totalSATD = 0;
-      uint64_t curSATD = 0;
-      for (int i = 0; i < pa.m_size; i++)
+    //if (pa.curidx == 0)
+    //{
+      double totalSATD = 0;
+      double curSATD = 0;
+      //for (int i = 0; i < pa.m_size; i++)
+      for (int i = 0; i < realInfluencePicture; i++)
       {
-        if (i == 0)
+        if (i < GOPSize)
         {
-          curSATD += pa.FrameSATD[pa.curidx + i];
+          curSATD += pow(pa.FrameSATD[pa.curidx + i],1);
+          //curSATD += 1;
         }
-        totalSATD += pa.FrameSATD[pa.curidx + i];
+        totalSATD += pow(pa.FrameSATD[pa.curidx + i],1);
+        //totalSATD += 1;
       }
       targetBits = (int)(curSATD / (double)totalSATD*paTargetBits);
-      
-    }
-    else
-    {
-      uint64_t totalSATD = 0;
-      uint64_t curSATD = 0;
-      for (int i = 0; i < pa.m_size; i++)
-      {
-        if (i < g_GOPSizeLD)
-        {
-          curSATD += pa.FrameSATD[pa.curidx + i];
-        }
-        totalSATD += pa.FrameSATD[pa.curidx + i];
-      }
-      targetBits = (int)(curSATD / (double)totalSATD*paTargetBits);
-    }
+      printf("targetBits:%d\tcurSATD:%.1f\ttotalSATD:%.1f", targetBits, curSATD, totalSATD);
+    //}
+    //else
+    //{
+    //  uint64_t totalSATD = 0;
+    //  uint64_t curSATD = 0;
+    //  //for (int i = 0; i < pa.m_size; i++)
+    //  for (int i = 0; i < realInfluencePicture; i++)
+    //  {
+    //    if (i < g_GOPSizeLD)
+    //    {
+    //      curSATD += pa.FrameSATD[pa.curidx + i];
+    //    }
+    //    totalSATD += pa.FrameSATD[pa.curidx + i];
+    //  }
+    //  targetBits = (int)(curSATD / (double)totalSATD*paTargetBits);
+    //  printf("pa.curidx:%d\n", pa.curidx);
+    //}
   }
   else
   {
@@ -2603,6 +2612,8 @@ int EncRCGOP::xEstGOPTargetBits(EncRCSeq* encRCSeq, int GOPSize)
   int averageTargetBitsPerPic = (int)(encRCSeq->getTargetBits() / encRCSeq->getTotalFrames());
   int currentTargetBitsPerPic = (int)((encRCSeq->getBitsLeft() - averageTargetBitsPerPic * (encRCSeq->getFramesLeft() - realInfluencePicture)) / realInfluencePicture);
   int targetBits = currentTargetBitsPerPic * GOPSize;
+  int swbits = (int) (encRCSeq->getBitsLeft() - averageTargetBitsPerPic * (encRCSeq->getFramesLeft() - realInfluencePicture));
+  printf("realInfluencePicture:%d\taverageTargetBitsPerPic:%d\tcurrentTargetBitsPerPic:%d\tswbits:%d\tTargetBits:%d\t", realInfluencePicture, averageTargetBitsPerPic, currentTargetBitsPerPic, swbits, targetBits);
 
   if (targetBits < 200)
   {
@@ -2613,7 +2624,7 @@ int EncRCGOP::xEstGOPTargetBits(EncRCSeq* encRCSeq, int GOPSize)
 #endif
 
 #if printRCvar
-  printf("GOP-LEVEL R:%d\t", targetBits);
+  printf("\nGOP-LEVEL R:%d\t", targetBits);
 #endif
   return targetBits;
 }
@@ -2955,6 +2966,46 @@ double EncRCPic::estimatePicLambda(list<EncRCPic*>& listPreviousPictures, bool i
     double BUTargetBits = m_targetBits * m_LCUs[i].m_bitWeight / totalWeight;
     m_LCUs[i].m_bitWeight = BUTargetBits;
   }
+#elif yang2019content
+  ////////// scenechange
+  extern pre_analysis pa;
+  pa.scenechange.push_back(pa.check_scenechange(poc));
+  ////////// CTU classification
+  for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+  {
+    pa.CTU_classification(poc, ctuidx);
+  }
+
+  double totalWeight = 0.0;
+  // initial BU bit allocation weight
+  for (int i = 0; i < m_numberOfLCU; i++)
+  {
+    double alphaLCU, betaLCU;
+    if (m_encRCSeq->getUseLCUSeparateModel())
+    {
+      alphaLCU = m_encRCSeq->getLCUPara(m_frameLevel, i).m_alpha;
+      betaLCU = m_encRCSeq->getLCUPara(m_frameLevel, i).m_beta;
+    }
+    else
+    {
+      alphaLCU = m_encRCSeq->getPicPara(m_frameLevel).m_alpha;
+      betaLCU = m_encRCSeq->getPicPara(m_frameLevel).m_beta;
+    }
+
+    m_LCUs[i].m_bitWeight = m_LCUs[i].m_numberOfPixel * pow(estLambda / alphaLCU, 1.0 / betaLCU);
+
+    if (m_LCUs[i].m_bitWeight < 0.01)
+    {
+      m_LCUs[i].m_bitWeight = 0.01;
+    }
+    totalWeight += m_LCUs[i].m_bitWeight;
+  }
+  for (int i = 0; i < m_numberOfLCU; i++)
+  {
+    double BUTargetBits = m_targetBits * m_LCUs[i].m_bitWeight / totalWeight;
+    m_LCUs[i].m_bitWeight = BUTargetBits;
+  }
+
 #else
   double totalWeight = 0.0;
   // initial BU bit allocation weight

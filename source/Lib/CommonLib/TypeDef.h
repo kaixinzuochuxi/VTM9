@@ -60,17 +60,42 @@
 #define printRCvar 1
 
 #if SATDRC
-#define SWBA 1
+#define SWBA 0
 #define RIrefine 0
 #define RIUpdateWithActual 0
 #define updateBAwithClipLambda 0
 #define weight_frame_satd 0
-#define weight_cu_satd 1
+#define weight_cu_satd 0
 //#undef pre_ana
 //#define pre_ana 1
 #endif
 
+#define yang2019content 1
+// build cu tree, print CU level information
+#define build_cu_tree 0
+/////
+#if build_cu_tree 
+//cfg 
+#define disableintraininter 1
+#define predfromori 1
+#define disablefast 0
+// output
+#define outputjson 1
+#define simplify20200506 0
+#define simplify20200718 1
+#define printall 1
+#define printchormacu 0
+#define printresirec 0
+#define preddist 0
+#define meansatd 1
 
+#if predfromori
+#define keepbestoricost 0
+#if printresirec
+#define printresiori 1
+#endif
+#endif
+#endif
 
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_R0058                                        1 // JVET-R0058: the combination of RPR, subpictures, and scalability 

@@ -366,6 +366,14 @@ struct CodingUnit : public UnitArea
   const bool        isLocalSepTree() const;
   const bool        isConsInter() const { return modeType == MODE_TYPE_INTER; }
   const bool        isConsIntra() const { return modeType == MODE_TYPE_INTRA; }
+
+#if build_cu_tree && meansatd
+  Distortion satdrec;
+#if predfromori
+  Distortion satdori;
+#endif
+
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -377,6 +385,16 @@ struct IntraPredictionData
   uint32_t  intraDir[MAX_NUM_CHANNEL_TYPE];
   bool      mipTransposedFlag;
   int       multiRefIdx;
+#if build_cu_tree
+  Distortion intradist;
+  //Distortion interdist;
+  //double cost;
+  uint64_t intrabits;
+#if predfromori
+  Distortion intradistori;
+  uint64_t intrabitsori;
+#endif
+#endif
 };
 
 struct InterPredictionData
@@ -405,6 +423,27 @@ struct InterPredictionData
   Mv        bv;                             // block vector for IBC
   Mv        bvd;                            // block vector difference for IBC
   uint8_t   mmvdEncOptMode;                  // 0: no action 1: skip chroma MC for MMVD candidate pre-selection 2: skip chroma MC and BIO for MMVD candidate pre-selection
+#if build_cu_tree
+//Distortion intradist;
+  Distortion interdist;
+  uint64_t interbits;
+  Distortion D_currecwoilf_curori_refrec;
+  double orisigma;
+  double refsigma0;
+  double refsigma1;
+  double D_refrec_curori_0;
+  double D_refrec_curori_1;
+#if predfromori
+  Distortion interdistori;
+  Distortion D_currecwoilf_curori_refori;
+  uint64_t interbitsori;
+  double reforisigma0;
+  double reforisigma1;
+  double SSEY_refori_curori_0;
+  double SSEY_refori_curori_1;
+#endif
+  //double cost;
+#endif
 };
 
 struct PredictionUnit : public UnitArea, public IntraPredictionData, public InterPredictionData

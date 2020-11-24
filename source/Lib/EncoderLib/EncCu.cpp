@@ -52,6 +52,9 @@
 #include <stdio.h>
 #include <cmath>
 #include <algorithm>
+#if build_cu_tree
+#include "Buffer.h"
+#endif
 
 
 
@@ -333,6 +336,1212 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
   tempCS->prevQP[CH_L] = bestCS->prevQP[CH_L] = prevQP[CH_L];
 
   xCompressCU(tempCS, bestCS, partitioner);
+#if build_cu_tree
+
+#if !printall
+  if (cs.slice->getPOC() > 0)
+#endif
+  {
+    //char *s[] = {
+//    vector<string>s = {
+//    "MODE_INTER" ,     ///< inter-prediction mode
+//    "MODE_INTRA" ,     ///< intra-prediction mode
+//#if JVET_M0483_IBC
+//    "MODE_IBC",     ///< ibc-prediction mode
+//    "NUMBER_OF_PREDICTION_MODES" ,
+//#else
+//    NUMBER_OF_PREDICTION_MODES ,
+//#endif
+//    };
+    //for (auto pu : bestCS->pus)
+    //{
+    //  printf("(%4d* %4d* %4d* %4d*) %s intraDir:%2d interDir:%3d skip:%d merge:%d mergeIdx:%3d affine:%d\tmhIntraFlag:%d\t (MV: %d %d\t%d %d) (ref: %d %d)\n",
+    //    pu->lumaPos().x, pu->lumaPos().y, pu->lumaSize().width, pu->lumaSize().height,
+    //    s[pu->cu->predMode],
+    //    pu->intraDir[0],
+    //    pu->interDir,
+    //    pu->cu->skip,
+    //    pu->mergeFlag,
+    //    pu->mergeIdx,
+    //    pu->cu->affine,
+    //    pu->mhIntraFlag,
+    //    pu->mv[0].hor,
+    //    pu->mv[0].ver,
+    //    pu->mv[1].hor,
+    //    pu->mv[1].ver,
+    //    pu->refIdx[0],
+    //    pu->refIdx[1]
+    //  );
+    //}
+    Distortion temp = 0;
+
+    for (auto pu : bestCS->pus)
+    {
+      // location
+#if simplify20200506 || simplify20200718
+      printf("||");
+#else
+      printf("|%4d %4d %4d %4d %4d | ", pu->lumaPos().x, pu->lumaPos().y, pu->lumaSize().width, pu->lumaSize().height, bestCS->slice->getPOC());
+#endif
+
+#if preddist   
+
+      ///// compute sigma
+      {
+        pu->orisigma = 0;
+        pu->refsigma0 = 0;
+        pu->refsigma1 = 0;
+        pu->D_refrec_curori_0 = 0;
+        pu->D_refrec_curori_1 = 0;
+
+        auto pbuf = pu->cs->picture->getTrueOrigBuf(pu->blocks[0]);
+        //double distortionpred = 0;
+        //auto pbufpred = pu->cs->picture->getPredBuf(pu->blocks[0]);
+        int x = pu->lx();
+        int y = pu->ly();
+
+        if (x == 80 && y == 16)
+          int xxx = 0;
+        /////orisigma
+        auto avg = pbuf.computeAvg();
+        for (int ly = 0; ly < pu->blocks[0].height; ly++)
+          for (int lx = 0; lx < pu->blocks[0].width; lx++)
+          {
+            pu->orisigma += (pbuf.at(lx, ly) - avg)*(pbuf.at(lx, ly) - avg);
+            //distortionpred += (pbuf.at(lx, ly) - pbufpred.at(lx, ly))*(pbuf.at(lx, ly) - pbufpred.at(lx, ly));
+          }
+        ///// ref0
+        double avgofref = 0;
+        if (pu->refIdx[0] != -1)
+        {
+
+          auto prefbuf0 = pu->refIdx[0] == 16 ?
+            pu->cs->picture->getRecoBuf().Y() :
+            pu->cs->slice->getRefPic(REF_PIC_LIST_0, pu->refIdx[0])->getRecoBuf().Y();
+          //auto prefbuf0 = pu->cs->slice->getRefPic(REF_PIC_LIST_0, pu->refIdx[0])->getTrueOrigBuf().Y();
+
+          //PelBuf prefbuf = pu->cs->picture->getRecoBuf(pu->blocks[0]);
+          /*auto tbuf= pu->refIdx[0] == 16 ?
+            pu->cs->picture->getRecoBuf().Y() :
+            pu->cs->slice->getRefPic(REF_PIC_LIST_0, pu->refIdx[0])->getRecoBuf().Y();
+          tbuf.rspSignal(m_pcReshape->getInvLUT());*/
+          //prefbuf0.rspSignal(m_pcReshape->getInvLUT());
+         /* Pel *b = (Pel*) xMalloc(sizeof(Pel), prefbuf.width*prefbuf.height);
+          auto prefbuf0=AreaBuf<Pel>(b, prefbuf.stride, prefbuf.width, prefbuf.height);
+          prefbuf0.copyFrom(prefbuf);*/
+          if (pu->refIdx[0] == 16)
+            pbuf.rspSignal(m_pcReshape->getFwdLUT());
+
+
+
+          ///// non affine
+          if (pu->cu->affine == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 4;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+                int curx = max(0, min(x + lx + int(pu->mv[0].hor * mvscale), (int)cs.picture->lwidth()));
+                int cury = max(0, min(y + ly + int(pu->mv[0].ver * mvscale), (int)cs.picture->lheight()));
+                avgofref += prefbuf0.at(curx, cury);
+                pu->refsigma0 += prefbuf0.at(curx, cury)*prefbuf0.at(curx, cury);
+                pu->D_refrec_curori_0 += (prefbuf0.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf0.at(curx, cury) - pbuf.at(lx, ly));
+                /* pu->D_refrec_curori_0 += (prefbuf0.at(lx, ly) - pbuf.at(lx, ly))*(prefbuf0.at(lx, ly) - pbuf.at(lx, ly));
+                printf("%d\t%d\t%d\n", prefbuf0.at(lx, ly), pbuf.at(lx, ly), prefbuf0.at(lx, ly) - pbuf.at(lx, ly));*/
+
+              }
+            pu->refsigma0 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else if (pu->cu->affineType == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[0][1].hor - pu->mvAffi[0][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][1].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[0][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[0][1].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][1].ver - pu->mvAffi[0][0].hor) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[0][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf0.at(curx, cury);
+                pu->refsigma0 += prefbuf0.at(curx, cury)*prefbuf0.at(curx, cury);
+                pu->D_refrec_curori_0 += (prefbuf0.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf0.at(curx, cury) - pbuf.at(lx, ly));
+
+              }
+            pu->refsigma0 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[0][1].hor - pu->mvAffi[0][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][2].hor - pu->mvAffi[0][0].hor) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[0][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[0][1].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][2].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[0][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf0.at(curx, cury);
+                pu->refsigma0 += prefbuf0.at(curx, cury)*prefbuf0.at(curx, cury);
+                pu->D_refrec_curori_0 += (prefbuf0.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf0.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->refsigma0 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+
+
+          if (pu->refIdx[0] == 16)
+            pbuf.rspSignal(m_pcReshape->getInvLUT());
+        }
+
+        ///// ref1
+        avgofref = 0;
+        if (pu->refIdx[1] != -1)
+        {
+
+          auto prefbuf1 = pu->refIdx[1] == 16 ?
+            pu->cs->picture->getRecoBuf().Y() :
+            pu->cs->slice->getRefPic(REF_PIC_LIST_1, pu->refIdx[1])->getRecoBuf().Y();
+
+          /*Pel *b = (Pel*)xMalloc(sizeof(Pel), prefbuf.width*prefbuf.height);
+          auto prefbuf1 = AreaBuf<Pel>(b, prefbuf.stride, prefbuf.width, prefbuf.height);
+          prefbuf1.copyFrom(prefbuf);*/
+          if (pu->refIdx[1] == 16)
+            pbuf.rspSignal(m_pcReshape->getFwdLUT());
+          ///// non affine
+          if (pu->cu->affine == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 4;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+                int curx = x + lx + int(pu->mv[1].hor * mvscale);
+                int cury = y + ly + int(pu->mv[1].ver * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf1.at(curx, cury);
+                pu->refsigma1 += prefbuf1.at(curx, cury)*prefbuf1.at(curx, cury);
+                pu->D_refrec_curori_1 += (prefbuf1.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf1.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->refsigma1 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else if (pu->cu->affineType == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[1][1].hor - pu->mvAffi[1][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][1].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[1][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[1][1].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][1].ver - pu->mvAffi[1][0].hor) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[1][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf1.at(curx, cury);
+                pu->refsigma1 += prefbuf1.at(curx, cury)*prefbuf1.at(curx, cury);
+                pu->D_refrec_curori_1 += (prefbuf1.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf1.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->refsigma1 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[1][1].hor - pu->mvAffi[1][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][2].hor - pu->mvAffi[1][0].hor) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[1][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[1][1].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][2].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[1][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf1.at(curx, cury);
+                pu->refsigma1 += prefbuf1.at(curx, cury)*prefbuf1.at(curx, cury);
+                pu->D_refrec_curori_1 += (prefbuf1.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf1.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->refsigma1 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+
+          /*xFree(b);
+          b = nullptr;*/
+          if (pu->refIdx[1] == 16)
+            pbuf.rspSignal(m_pcReshape->getInvLUT());
+        }
+
+
+
+#if predfromori
+        pu->reforisigma0 = 0;
+        pu->reforisigma1 = 0;
+        pu->SSEY_refori_curori_0 = 0;
+        pu->SSEY_refori_curori_1 = 0;
+        ///// ref0
+        avgofref = 0;
+        if (pu->refIdx[0] != -1)
+        {
+
+          auto prefbuf0 = pu->refIdx[0] == 16 ?
+            pu->cs->picture->getTrueOrigBuf().Y() :
+            pu->cs->slice->getRefPic(REF_PIC_LIST_0, pu->refIdx[0])->getTrueOrigBuf().Y();
+
+          /*Pel *b = (Pel*)xMalloc(sizeof(Pel), prefbuf.width*prefbuf.height);
+          auto prefbuf0 = AreaBuf<Pel>(b, prefbuf.stride, prefbuf.width, prefbuf.height);
+          prefbuf0.copyFrom(prefbuf);*/
+
+          ///// non affine
+          if (pu->cu->affine == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 4;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+                int curx = x + lx + int(pu->mv[0].hor * mvscale);
+                int cury = y + ly + int(pu->mv[0].ver * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf0.at(curx, cury);
+                pu->reforisigma0 += prefbuf0.at(curx, cury)*prefbuf0.at(curx, cury);
+                pu->SSEY_refori_curori_0 += (prefbuf0.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf0.at(curx, cury) - pbuf.at(lx, ly));
+
+
+
+              }
+            pu->reforisigma0 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else if (pu->cu->affineType == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[0][1].hor - pu->mvAffi[0][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][1].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[0][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[0][1].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][1].ver - pu->mvAffi[0][0].hor) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[0][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf0.at(curx, cury);
+                pu->reforisigma0 += prefbuf0.at(curx, cury)*prefbuf0.at(curx, cury);
+                pu->SSEY_refori_curori_0 += (prefbuf0.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf0.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->reforisigma0 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[0][1].hor - pu->mvAffi[0][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][2].hor - pu->mvAffi[0][0].hor) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[0][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[0][1].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[0][2].ver - pu->mvAffi[0][0].ver) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[0][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf0.at(curx, cury);
+                pu->reforisigma0 += prefbuf0.at(curx, cury)*prefbuf0.at(curx, cury);
+                pu->SSEY_refori_curori_0 += (prefbuf0.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf0.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->reforisigma0 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+
+          /*xFree(b);
+          b = nullptr;*/
+        }
+
+        ///// ref1
+        avgofref = 0;
+        if (pu->refIdx[1] != -1)
+        {
+
+          auto prefbuf1 = pu->refIdx[1] == 16 ?
+            pu->cs->picture->getTrueOrigBuf().Y() :
+            pu->cs->slice->getRefPic(REF_PIC_LIST_1, pu->refIdx[1])->getTrueOrigBuf().Y();
+
+          /*Pel *b = (Pel*)xMalloc(sizeof(Pel), prefbuf.width*prefbuf.height);
+          auto prefbuf1 = AreaBuf<Pel>(b, prefbuf.stride, prefbuf.width, prefbuf.height);
+          prefbuf1.copyFrom(prefbuf);*/
+
+          ///// non affine
+          if (pu->cu->affine == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 4;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+                int curx = x + lx + int(pu->mv[1].hor * mvscale);
+                int cury = y + ly + int(pu->mv[1].ver * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf1.at(curx, cury);
+                pu->reforisigma1 += prefbuf1.at(curx, cury)*prefbuf1.at(curx, cury);
+                pu->SSEY_refori_curori_1 += (prefbuf1.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf1.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->reforisigma1 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else if (pu->cu->affineType == 0)
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[1][1].hor - pu->mvAffi[1][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][1].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[1][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[1][1].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][1].ver - pu->mvAffi[1][0].hor) / double(pu->blocks[0].width)*(y + ly)
+                  + pu->mvAffi[1][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf1.at(curx, cury);
+                pu->reforisigma1 += prefbuf1.at(curx, cury)*prefbuf1.at(curx, cury);
+                pu->SSEY_refori_curori_1 += (prefbuf1.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf1.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->reforisigma1 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+          else
+          {
+            //double mvscale = pu->cu->imv == 0 ? 0.25 : pu->cu->imv == 1 ? 1 : 1 / 16;
+            double mvscale = 1.0 / 16;
+            for (int ly = 0; ly < pu->blocks[0].height; ly++)
+              for (int lx = 0; lx < pu->blocks[0].width; lx++)
+              {
+
+                int curx = x + lx + int(((pu->mvAffi[1][1].hor - pu->mvAffi[1][0].hor) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][2].hor - pu->mvAffi[1][0].hor) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[1][0].hor)
+                  * mvscale);
+                int cury = y + ly + int(((pu->mvAffi[1][1].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].width)*(x + lx)
+                  + (pu->mvAffi[1][2].ver - pu->mvAffi[1][0].ver) / double(pu->blocks[0].height)*(y + ly)
+                  + pu->mvAffi[1][0].ver)
+                  * mvscale);
+                curx = max(0, min(curx, (int)cs.picture->lwidth()));
+                cury = max(0, min(cury, (int)cs.picture->lheight()));
+                avgofref += prefbuf1.at(curx, cury);
+                pu->reforisigma1 += prefbuf1.at(curx, cury)*prefbuf1.at(curx, cury);
+                pu->SSEY_refori_curori_1 += (prefbuf1.at(curx, cury) - pbuf.at(lx, ly))*(prefbuf1.at(curx, cury) - pbuf.at(lx, ly));
+              }
+            pu->reforisigma1 -= avgofref * avgofref / pu->blocks[0].height / pu->blocks[0].width;
+          }
+
+          /*xFree(b);
+          b = nullptr;*/
+        }
+
+#endif
+
+
+      }
+#endif
+      // dist,bits
+#if outputjson
+#if simplify20200506
+
+
+      printf("{");
+      printf("\"interbits\":%ju,\"distwithrec\":%ju",
+        pu->interbits, pu->D_currecwoilf_curori_refrec);
+
+#if meansatd
+      //if (cs.slice[0].getSliceType() == I_SLICE)
+      {
+        printf(",\"satdrec\":%ju",
+          pu->cu->satdrec);
+      }
+
+#endif
+#if predfromori
+      printf(",\"interbitsori\":%ju,\"distwithori\":%ju",
+        pu->interbitsori, pu->D_currecwoilf_curori_refori);
+
+      //{
+      //  printf(",\"resibits\":%ju",
+      //    pu->cu->cucp.R_resi[0]+ pu->cu->cucp.R_resi[1]+ pu->cu->cucp.R_resi[2]);
+      //}
+
+#if meansatd
+      //if (cs.slice[0].getSliceType() == I_SLICE)
+
+      //else
+      {
+        printf(",\"satdori\":%ju",
+          pu->cu->satdori);
+      }
+#endif
+
+
+
+
+#endif
+
+
+#if printresirec
+      double avgresirec = 0;
+#if printresiori
+      double avgresiori = 0;
+#endif
+      for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+      {
+        for (int y = 0; y < ttu.lheight(); y++)
+        {
+          for (int x = 0; x < ttu.lwidth(); x++)
+          {
+            avgresirec += abs(ttu.m_resiwoq[0][y* ttu.lwidth() + x]);
+#if printresiori
+            avgresiori += abs(ttu.m_resiwoqori[0][y* ttu.lwidth() + x]);
+#endif
+          }
+
+        }
+      }
+
+      avgresirec = avgresirec / (cs.slice[0].getPic()->lwidth()*cs.slice[0].getPic()->lheight());
+      printf(",\"avgresirec\":%.6f,",
+        avgresirec);
+#if printresiori
+      avgresiori = avgresiori / (cs.slice[0].getPic()->lwidth()*cs.slice[0].getPic()->lheight());
+      printf("\"avgresiori\":%.6f",
+        avgresiori);
+#endif
+#endif
+      // parameter
+      //printf("\t QP:%d lambda:%f | ", pu->cu->qp, m_pcRdCost->getLambda());
+      printf("}|{");
+      // mode
+      /*printf("\"skip\":%d,\"cbf\":%d",
+
+        pu->cu->skip,
+        pu->cu->rootCbf
+
+      );*/
+
+      printf(",\"refidx\":[%d,%d] ", pu->refIdx[0], pu->refIdx[1]);
+
+      /*printf(",\"refpoc\":[ ", );
+      for (int iRefList = 0; iRefList < 2; iRefList++)
+      {
+        printf("[");
+        for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
+        {
+          if (iRefIndex != 0)
+            printf(",");
+          printf("%d", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
+        }
+        printf("]");
+        if (iRefList == 0)
+          printf(",");
+      }
+      printf("]");*/
+      printf("}");
+#elif simplify20200718
+      printf("{");
+
+
+#if meansatd
+      if (cs.slice[0].getSliceType() == I_SLICE)
+      {
+        printf("\"e1\":%ju",
+          pu->cu->satdrec);
+      }
+      else
+      {
+        printf("\"a1\":%ju,\"c1\":%ju",
+          pu->interbits, pu->D_currecwoilf_curori_refrec);
+#if predfromori
+        printf(",\"b1\":%ju,\"d1\":%ju",
+          pu->interbitsori, pu->D_currecwoilf_curori_refori);
+
+        //{
+        //  printf(",\"resibits\":%ju",
+        //    pu->cu->cucp.R_resi[0]+ pu->cu->cucp.R_resi[1]+ pu->cu->cucp.R_resi[2]);
+        //}
+
+#if meansatd
+      //if (cs.slice[0].getSliceType() == I_SLICE)
+
+      //else
+        {
+          printf(",\"f1\":%ju",
+            pu->cu->satdori);
+        }
+#endif
+
+
+
+
+#endif
+      }
+#endif
+
+
+
+#if printresirec
+      double avgresirec = 0;
+#if printresiori
+      double avgresiori = 0;
+#endif
+      for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+      {
+        for (int y = 0; y < ttu.lheight(); y++)
+        {
+          for (int x = 0; x < ttu.lwidth(); x++)
+          {
+            avgresirec += abs(ttu.m_resiwoq[0][y* ttu.lwidth() + x]);
+#if printresiori
+            avgresiori += abs(ttu.m_resiwoqori[0][y* ttu.lwidth() + x]);
+#endif
+          }
+
+        }
+      }
+
+      avgresirec = avgresirec / (cs.slice[0].getPic()->lwidth()*cs.slice[0].getPic()->lheight());
+      printf(",\"avgresirec\":%.6f,",
+        avgresirec);
+#if printresiori
+      avgresiori = avgresiori / (cs.slice[0].getPic()->lwidth()*cs.slice[0].getPic()->lheight());
+      printf("\"avgresiori\":%.6f",
+        avgresiori);
+#endif
+#endif
+      // parameter
+      //printf("\t QP:%d lambda:%f | ", pu->cu->qp, m_pcRdCost->getLambda());
+      printf("}|{");
+      // mode
+      /*printf("\"skip\":%d,\"cbf\":%d",
+
+        pu->cu->skip,
+        pu->cu->rootCbf
+
+      );*/
+
+      //printf(",\"refidx\":[%d,%d] ",  pu->refIdx[0], pu->refIdx[1]);
+      if (cs.slice[0].getSliceType() != I_SLICE)
+      {
+        printf("\"g1\":[%d,%d] ", pu->refIdx[0], pu->refIdx[1]);
+      }
+      /*printf(",\"refpoc\":[ ", );
+      for (int iRefList = 0; iRefList < 2; iRefList++)
+      {
+        printf("[");
+        for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
+        {
+          if (iRefIndex != 0)
+            printf(",");
+          printf("%d", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
+        }
+        printf("]");
+        if (iRefList == 0)
+          printf(",");
+      }
+      printf("]");*/
+      printf("}");
+#else
+
+      printf("{ \"intradist\":%ju, \"interdist\":%ju, \"intrabits\":%ju ,\"interbits\":%ju, \"distwithrec\":%ju  ",
+        pu->intradist, pu->interdist, pu->intrabits, pu->interbits, pu->D_currecwoilf_curori_refrec);
+#if preddist
+      printf(", \"orisigma\":%.2f, \"refsigma0\":%.2f ,\"refsigma1\":%.2f, \"SSEY_refrec_curori_0\":%.2f, \"SSEY_refrec_curori_1\":%.2f",
+        pu->orisigma, pu->refsigma0, pu->refsigma1, pu->D_refrec_curori_0, pu->D_refrec_curori_1);
+#endif
+#if predfromori
+      printf(" ,\"interdistori\":%ju,  \"interbitsori\":%ju, \"distwithori\":%ju ",
+        pu->interdistori, pu->interbitsori, pu->D_currecwoilf_curori_refori);
+#if preddist
+      printf(" , \"reforisigma0\":%.2f, \"reforisigma1\":%.2f, \"SSEY_refori_curori_0\":%.2f, \"SSEY_refori_curori_1\":%.2f ",
+        pu->reforisigma0, pu->reforisigma1, pu->SSEY_refori_curori_0, pu->SSEY_refori_curori_1);
+#endif
+
+#endif
+      // parameter
+      //printf("\t QP:%d lambda:%f | ", pu->cu->qp, m_pcRdCost->getLambda());
+      printf(" } | { ");
+      // mode
+      printf(" \"affine\":%d,\"imv\":%d,\"affinetype\":%d,\"skip\":%d,\"cbf\":%d,\"mhintra\":%d,\"triangle\":%d,\"merge\":%d,\"mergeidx\":%d,\"gbi\":%d,\"intradir\":[%u,%u],\"multiRefIdx\":%d   ",
+        pu->cu->affine,
+        pu->cu->imv,
+        pu->cu->affineType,
+        pu->cu->skip,
+        pu->cu->rootCbf,
+        pu->mhIntraFlag,
+        pu->cu->triangle,
+        pu->mergeFlag,
+        pu->mergeIdx,
+        pu->cu->GBiIdx,
+
+        pu->intraDir[0],
+        pu->intraDir[1],
+        pu->multiRefIdx
+      );
+      printf(" ,\"mv\":[%d,%d,%d,%d], \"affinemv\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d] ",
+        pu->mv[0].hor,
+        pu->mv[0].ver,
+        pu->mv[1].hor,
+        pu->mv[1].ver,
+        pu->mvAffi[0][0].hor,
+        pu->mvAffi[0][0].ver,
+        pu->mvAffi[0][1].hor,
+        pu->mvAffi[0][1].ver,
+        pu->mvAffi[0][2].hor,
+        pu->mvAffi[0][2].ver,
+        pu->mvAffi[1][0].hor,
+        pu->mvAffi[1][0].ver,
+        pu->mvAffi[1][1].hor,
+        pu->mvAffi[1][1].ver,
+        pu->mvAffi[1][2].hor,
+        pu->mvAffi[1][2].ver
+
+      );
+      printf(" ,\"interdir\":%d, \"refidx\":[%d,%d],\"refpoc\":[ ", pu->interDir, pu->refIdx[0], pu->refIdx[1]);
+      for (int iRefList = 0; iRefList < 2; iRefList++)
+      {
+        printf(" [ ");
+        for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
+        {
+          if (iRefIndex != 0)
+            printf(",");
+          printf("%d", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
+
+        }
+        printf(" ]");
+        if (iRefList == 0)
+          printf(",");
+      }
+      printf("] }");
+#endif
+#else
+      printf("intradist:%ju interdist:%ju intrabits:%ju interbits:%ju orisigma:%.2f refsigma0:%.2f refsigma1:%.2f D_refrec_curori_0:%.2f D_refrec_curori_1:%.2f ",
+        pu->intradist, pu->interdist, pu->intrabits, pu->interbits, pu->orisigma, pu->refsigma0, pu->refsigma1, pu->D_refrec_curori_0, pu->D_refrec_curori_1);
+#if predfromori
+      printf(" interdistori:%ju  interbitsori:%ju D_currecwoilf_curori_refrec:%ju D_currecwoilf_curori_refori:%ju reforisigma0:%.2f reforisigma1:%.2f D_refori_curori_0:%.2f D_refori_curori_1:%.2f ",
+        pu->interdistori, pu->interbitsori, pu->D_currecwoilf_curori_refrec, pu->D_currecwoilf_curori_refori, pu->reforisigma0, pu->reforisigma1, pu->SSEY_refori_curori_0, pu->SSEY_refori_curori_1);
+
+
+#endif
+      // parameter
+      printf("\t QP:%d lambda:%f | ", pu->cu->qp, m_pcRdCost->getLambda());
+
+      // mode
+      printf("affine:%d*imv:%d*affinetype:%d*skip:%d*cbf:%d*mhintra:%d*triangle:%d*mergeFlag:%d*mergeidx:%d*gbi:%d*intradir:%u&%u*multiRefIdx:%d  ",
+        pu->cu->affine,
+        pu->cu->imv,
+        pu->cu->affineType,
+        pu->cu->skip,
+        pu->cu->rootCbf,
+        pu->mhIntraFlag,
+        pu->cu->triangle,
+        pu->mergeFlag,
+        pu->mergeIdx,
+        pu->cu->GBiIdx,
+
+        pu->intraDir[0],
+        pu->intraDir[1],
+        pu->multiRefIdx
+      );
+      printf(" MV:%d*%d*%d*%d affineMV:%d*%d*%d*%d*%d*%d*%d*%d*%d*%d*%d*%d ",
+        pu->mv[0].hor,
+        pu->mv[0].ver,
+        pu->mv[1].hor,
+        pu->mv[1].ver,
+        pu->mvAffi[0][0].hor,
+        pu->mvAffi[0][0].ver,
+        pu->mvAffi[0][1].hor,
+        pu->mvAffi[0][1].ver,
+        pu->mvAffi[0][2].hor,
+        pu->mvAffi[0][2].ver,
+        pu->mvAffi[1][0].hor,
+        pu->mvAffi[1][0].ver,
+        pu->mvAffi[1][1].hor,
+        pu->mvAffi[1][1].ver,
+        pu->mvAffi[1][2].hor,
+        pu->mvAffi[1][2].ver
+
+      );
+      printf("interDir:%d ref:%d*%d ", pu->interDir, pu->refIdx[0], pu->refIdx[1]);
+      for (int iRefList = 0; iRefList < 2; iRefList++)
+      {
+        printf("L%d:", iRefList);
+        for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
+        {
+          printf("%d-", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
+        }
+        //printf( " ");
+      }
+#endif
+#if printresirec
+      {
+        bool resiwoq = 0;
+        bool resiwq = 0;
+        bool spresiwoq = 0;
+        bool spresiwq = 0;
+        bool printinaline = 1;
+
+        if (!printinaline)
+        {
+          printf(" | \n");
+          if (pu->cu->firstTU == pu->cu->lastTU)
+          {
+            /*for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+            {
+              printf("%3d\t", pu->cu->firstTU->m_resiwoq[0][p]);
+              printf("%3d\t", pu->cu->firstTU->m_resiwq[0][p]);
+              printf("%3d\t", pu->cu->firstTU->m_spresiwoq[0][p]);
+              printf("%3d\t\n", pu->cu->firstTU->m_spresiwq[0][p]);
+            }*/
+            for (int y = 0; y < pu->lumaSize().height; y++)
+            {
+              if (resiwoq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d ", pu->cu->firstTU->m_resiwoq[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\t|\t");
+              }
+              if (resiwq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d ", pu->cu->firstTU->m_resiwq[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\t|\t");
+              }
+              if (spresiwoq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d ", pu->cu->firstTU->m_spresiwoq[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\t|\t");
+              }
+              if (spresiwq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d", pu->cu->firstTU->m_spresiwq[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\n");
+              }
+            }
+            printf("\n");
+          }
+          else {
+            for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU))
+            {
+
+              //for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+              //{
+              //  printf("%3d\t", ttu.m_resiwoq[0][p]);
+              //  printf("%3d\t", ttu.m_resiwq[0][p]);
+              //  printf("%3d\t", ttu.m_spresiwoq[0][p]);
+              //  printf("%3d\t\n", ttu.m_spresiwq[0][p]);
+
+              //}
+              for (int y = 0; y < ttu.lheight(); y++)
+              {
+                if (resiwoq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_resiwoq[0][y* ttu.lwidth() + x]);
+                  }
+                  printf("\t|\t");
+                }
+                if (resiwq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_resiwq[0][y* ttu.lwidth() + x]);
+                  }
+                  printf("\t|\t");
+                }
+                if (spresiwoq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_spresiwoq[0][y* ttu.lwidth() + x]);
+                  }
+                  printf("\t|\t");
+                }
+                if (spresiwq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_spresiwq[0][y* ttu.lwidth() + x]);
+                  }
+                  printf("\n");
+                }
+              }
+              printf("\n");
+            }
+          }
+        }
+        else
+        {
+          printf(" | ");
+          if (pu->cu->firstTU == pu->cu->lastTU)
+          {
+            if (resiwoq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+                printf("%d ", pu->cu->firstTU->m_resiwoq[0][p]);
+
+              }
+              printf(" resiwoq! ");
+            }
+            if (resiwq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+
+                printf("%d ", pu->cu->firstTU->m_resiwq[0][p]);
+
+              }
+              printf(" resiwq! ");
+            }
+            if (spresiwoq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+
+                printf("%d ", pu->cu->firstTU->m_spresiwoq[0][p]);
+
+              }
+              printf(" resispwoq! ");
+            }
+            if (spresiwq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+
+                printf("%d ", pu->cu->firstTU->m_spresiwq[0][p]);
+              }
+              printf(" resispwq! ");
+            }
+          }
+          else {
+
+            if (resiwoq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+                  printf("%d ", ttu.m_resiwoq[0][p]);
+
+                }
+              }
+
+              printf(" resiwoq! ");
+            }
+            if (resiwq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+
+                  printf("%d ", ttu.m_resiwq[0][p]);
+
+                }
+              }
+              printf(" resiwq! ");
+            }
+            if (spresiwoq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+
+                  printf("%d ", ttu.m_spresiwoq[0][p]);
+
+                }
+              }
+              printf(" resispwoq! ");
+            }
+            if (spresiwq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+
+                  printf("%d ", ttu.m_spresiwq[0][p]);
+                }
+              }
+              printf(" resispwq! ");
+
+            }
+          }
+        }
+      }
+#endif
+#if printresiori
+      {
+        bool resiwoq = 0;
+        bool resiwq = 0;
+        bool spresiwoq = 0;
+        bool spresiwq = 0;
+        bool printinaline = 1;
+
+        if (!printinaline)
+        {
+          printf(" | \n");
+          if (pu->cu->firstTU == pu->cu->lastTU)
+          {
+            /*for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+            {
+              printf("%3d\t", pu->cu->firstTU->m_resiwoqori[0][p]);
+              printf("%3d\t", pu->cu->firstTU->m_resiwqori[0][p]);
+              printf("%3d\t", pu->cu->firstTU->m_spresiwoqori[0][p]);
+              printf("%3d\t\n", pu->cu->firstTU->m_spresiwqori[0][p]);
+            }*/
+            for (int y = 0; y < pu->lumaSize().height; y++)
+            {
+              if (resiwoq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d ", pu->cu->firstTU->m_resiwoqori[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\t|\t");
+              }
+              if (resiwq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d ", pu->cu->firstTU->m_resiwqori[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\t|\t");
+              }
+              if (spresiwoq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d ", pu->cu->firstTU->m_spresiwoqori[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\t|\t");
+              }
+              if (spresiwq)
+              {
+                for (int x = 0; x < pu->lumaSize().width; x++)
+                {
+                  printf("%4d", pu->cu->firstTU->m_spresiwqori[0][y*pu->lumaSize().width + x]);
+                }
+                printf("\n");
+              }
+            }
+            printf("\n");
+          }
+          else {
+            for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU))
+            {
+
+              //for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+              //{
+              //  printf("%3d\t", ttu.m_resiwoqori[0][p]);
+              //  printf("%3d\t", ttu.m_resiwqori[0][p]);
+              //  printf("%3d\t", ttu.m_spresiwoqori[0][p]);
+              //  printf("%3d\t\n", ttu.m_spresiwqori[0][p]);
+
+              //}
+              for (int y = 0; y < ttu.lheight(); y++)
+              {
+                if (resiwoq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_resiwoqori[0][y* ttu.lheight() + x]);
+                  }
+                  printf("\t|\t");
+                }
+                if (resiwq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_resiwqori[0][y* ttu.lheight() + x]);
+                  }
+                  printf("\t|\t");
+                }
+                if (spresiwoq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_spresiwoqori[0][y* ttu.lheight() + x]);
+                  }
+                  printf("\t|\t");
+                }
+                if (spresiwq)
+                {
+                  for (int x = 0; x < ttu.lwidth(); x++)
+                  {
+                    printf("%4d ", ttu.m_spresiwqori[0][y* ttu.lheight() + x]);
+                  }
+                  printf("\n");
+                }
+              }
+              printf("\n");
+            }
+          }
+        }
+        else
+        {
+          printf(" | ");
+          if (pu->cu->firstTU == pu->cu->lastTU)
+          {
+            if (resiwoq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+                printf("%d ", pu->cu->firstTU->m_resiwoqori[0][p]);
+
+              }
+              printf(" resiwoqori! ");
+            }
+            if (resiwq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+
+                printf("%d ", pu->cu->firstTU->m_resiwqori[0][p]);
+
+              }
+              printf(" resiwqori! ");
+            }
+            if (spresiwoq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+
+                printf("%d ", pu->cu->firstTU->m_spresiwoqori[0][p]);
+
+              }
+              printf(" resispwoqori! ");
+            }
+            if (spresiwq)
+            {
+              for (int p = 0; p < pu->lumaSize().width*pu->lumaSize().height; p++)
+              {
+
+                printf("%d ", pu->cu->firstTU->m_spresiwqori[0][p]);
+              }
+              printf(" resispwqori! ");
+            }
+          }
+          else {
+
+            if (resiwoq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+                  printf("%d ", ttu.m_resiwoqori[0][p]);
+
+                }
+              }
+              printf(" resiwoqori! ");
+            }
+            if (resiwq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+
+                  printf("%d ", ttu.m_resiwqori[0][p]);
+
+                }
+              }
+              printf(" resiwqori! ");
+            }
+            if (spresiwoq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+
+                  printf("%d ", ttu.m_spresiwoqori[0][p]);
+
+                }
+              }
+              printf(" resispwoqori! ");
+            }
+            if (spresiwq)
+            {
+              for (auto ttu : TUTraverser(pu->cu->firstTU, pu->cu->lastTU->next))
+              {
+                for (int p = 0; p < ttu.lheight()*ttu.lwidth(); p++)
+                {
+
+                  printf("%d ", ttu.m_spresiwqori[0][p]);
+                }
+              }
+              printf(" resispwqori! ");
+            }
+
+          }
+        }
+      }
+#endif
+      printf(" |\n");
+
+    }
+    //printf("luma CU finished\n");
+
+  }
+
+#endif
+
+
   cs.slice->m_mapPltCost[0].clear();
   cs.slice->m_mapPltCost[1].clear();
   // all signals were already copied during compression if the CTU was split - at this point only the structures are copied to the top level CS
@@ -353,7 +1562,96 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
     tempCS->prevQP[CH_C] = bestCS->prevQP[CH_C] = prevQP[CH_C];
 
     xCompressCU(tempCS, bestCS, partitioner);
+#if build_cu_tree && printchormacu
 
+#if !printall
+    if (cs.slice->getPOC() == 2)
+#endif
+    {
+      char *s[] = {
+        "MODE_INTER" ,     ///< inter-prediction mode
+        "MODE_INTRA" ,     ///< intra-prediction mode
+    #if JVET_M0483_IBC
+        "MODE_IBC",     ///< ibc-prediction mode
+        "NUMBER_OF_PREDICTION_MODES" ,
+    #else
+        NUMBER_OF_PREDICTION_MODES ,
+    #endif
+  };
+      //for (auto pu : bestCS->pus)
+      //{
+      //  printf("(%4d* %4d* %4d* %4d*) %s intraDir:%2d interDir:%3d skip:%d merge:%d mergeIdx:%3d affine:%d\tmhIntraFlag:%d\t (MV: %d %d\t%d %d) (ref: %d %d)\n",
+      //    pu->lumaPos().x, pu->lumaPos().y, pu->lumaSize().width, pu->lumaSize().height,
+      //    s[pu->cu->predMode],
+      //    pu->intraDir[0],
+      //    pu->interDir,
+      //    pu->cu->skip,
+      //    pu->mergeFlag,
+      //    pu->mergeIdx,
+      //    pu->cu->affine,
+      //    pu->mhIntraFlag,
+      //    pu->mv[0].hor,
+      //    pu->mv[0].ver,
+      //    pu->mv[1].hor,
+      //    pu->mv[1].ver,
+      //    pu->refIdx[0],
+      //    pu->refIdx[1]
+      //  );
+      //}
+      Distortion temp = 0;
+      for (auto pu : bestCS->pus)
+      {
+        printf("|%4d %4d %4d %4d %4d | ", pu->lumaPos().x, pu->lumaPos().y, pu->lumaSize().width, pu->lumaSize().height, bestCS->slice->getPOC()
+
+        );
+        printf("intradist:%llu interdist:%llu intrabits:%llu interbits:%llu ",
+          pu->intradist, pu->interdist, pu->intrabits, pu->interbits);
+#if predfromori
+        printf(" interdistori:%llu  interbitsori:%llu dist:%llu distori:%llu ",
+          pu->interdistori, pu->interbitsori, pu->D_currecwoilf_curori_refrec, pu->D_currecwoilf_curori_refori);
+#endif
+        printf("\t QP : %d | ", pu->cu->qp);
+        printf("affine:%d*imv:%d*affinetype:%d  MV:%d*%d*%d*%d affineMV:%d*%d*%d*%d*%d*%d*%d*%d*%d*%d*%d*%d ",
+          pu->cu->affine,
+          pu->cu->imv,
+          pu->cu->affineType,
+
+          pu->mv[0].hor,
+          pu->mv[0].ver,
+          pu->mv[1].hor,
+          pu->mv[1].ver,
+          pu->mvAffi[0][0].hor,
+          pu->mvAffi[0][0].ver,
+          pu->mvAffi[0][1].hor,
+          pu->mvAffi[0][1].ver,
+          pu->mvAffi[0][2].hor,
+          pu->mvAffi[0][2].ver,
+          pu->mvAffi[1][0].hor,
+          pu->mvAffi[1][0].ver,
+          pu->mvAffi[1][1].hor,
+          pu->mvAffi[1][1].ver,
+          pu->mvAffi[1][2].hor,
+          pu->mvAffi[1][2].ver
+
+        );
+        printf("interDir:%d ref:%d*%d ", pu->interDir, pu->refIdx[0], pu->refIdx[1]);
+        for (int iRefList = 0; iRefList < 2; iRefList++)
+        {
+          printf("L%d:", iRefList);
+          for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
+          {
+            printf("%d-", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
+          }
+          //printf( " ");
+        }
+
+        printf(" |\n");
+      }
+      printf("chorma cu finished\n");
+      //printf("sum:%lld\tcs:%lld\n", temp,bestCS->dist);
+     //printf("%d", temp == bestCS->dist);
+  }
+#endif
     const bool copyUnsplitCTUSignals = bestCS->cus.size() == 1;
     cs.useSubStructure(*bestCS, partitioner.chType, CS::getArea(*bestCS, area, partitioner.chType),
                        copyUnsplitCTUSignals, false, false, copyUnsplitCTUSignals, true);
@@ -777,6 +2075,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( currTestMode.type == ETM_INTRA )
     {
+#if !disableintraininter
       if (slice.getSPS()->getUseColorTrans() && !CS::isDualITree(*tempCS))
       {
         bool skipSecColorSpace = false;
@@ -814,6 +2113,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       {
         xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, false);
       }
+#endif
     }
     else if (currTestMode.type == ETM_PALETTE)
     {
@@ -1690,6 +2990,11 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
               bestCostSoFar = encTestMode.maxCostAllowed;
             }
             validCandRet = m_pcIntraSearch->estIntraPredLumaQT(cu, partitioner, bestCostSoFar, mtsFlag, startMTSIdx[trGrpIdx], endMTSIdx[trGrpIdx], (trGrpIdx > 0), !cu.colorTransform ? bestCS : nullptr);
+#if build_cu_tree
+            auto intradist = tempCS->dist;
+            auto intrabits = tempCS->fracBits;
+#endif
+            
             if ((!validCandRet || (cu.ispMode && cu.firstTU->cbf[COMPONENT_Y] == 0)))
             {
               continue;
@@ -4753,5 +6058,90 @@ int getRPLIdxRA(int poc)
 {
   return 0;
 }
+#if yang2019content 
+
+FwdTrans *fastFwdTrans1[NUM_TRANS_TYPE][g_numTransformMatrixSizes] =
+{
+  { fastForwardDCT2_B2, fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, fastForwardDCT2_B64 },
+  { nullptr,            fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, nullptr },
+  { nullptr,            fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, nullptr },
+};
+void pre_analysis::transfrom(const CPelBuf & resi, CoeffBuf & dstCoeff, const int width, const int height)
+{
+  int bitDepth = 10;
+  int maxLog2TrDynamicRange = 15;
+  const int      TRANSFORM_MATRIX_SHIFT = g_transformMatrixShift[TRANSFORM_FORWARD];
+  const uint32_t transformWidthIndex = floorLog2(width) - 1;  // nLog2WidthMinus1, since transform start from 2-point
+  const uint32_t transformHeightIndex = floorLog2(height) - 1;  // nLog2HeightMinus1, since transform start from 2-point
+
+  int trTypeHor = DCT2;
+  int trTypeVer = DCT2;
+  int  skipWidth = (trTypeHor != DCT2 && width == 32) ? 16 : width > JVET_C0024_ZERO_OUT_TH ? width - JVET_C0024_ZERO_OUT_TH : 0;
+  int  skipHeight = (trTypeVer != DCT2 && height == 32) ? 16 : height > JVET_C0024_ZERO_OUT_TH ? height - JVET_C0024_ZERO_OUT_TH : 0;
+  if (1)
+  {
+    if ((width == 4 && height > 4) || (width > 4 && height == 4))
+    {
+      skipWidth = width - 4;
+      skipHeight = height - 4;
+    }
+    else if ((width >= 8 && height >= 8))
+    {
+      skipWidth = width - 8;
+      skipHeight = height - 8;
+    }
+  }
+
+#if RExt__DECODER_DEBUG_TOOL_STATISTICS
+  if (trTypeHor != DCT2)
+  {
+    CodingStatistics::IncrementStatisticTool(CodingStatisticsClassType{ STATS__TOOL_EMT, uint32_t(width), uint32_t(height), compID });
+  }
+#endif
+
+  ALIGN_DATA(MEMORY_ALIGN_DEF_SIZE, TCoeff block[MAX_TB_SIZEY * MAX_TB_SIZEY]);
+
+  const Pel *resiBuf = resi.buf;
+  const int  resiStride = resi.stride;
+
+  for (int y = 0; y < height; y++)
+  {
+    for (int x = 0; x < width; x++)
+    {
+      block[(y * width) + x] = resiBuf[(y * resiStride) + x];
+    }
+  }
+
+  if (width > 1 && height > 1) // 2-D transform
+  {
+    const int      shift_1st = ((floorLog2(width)) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;
+    const int      shift_2nd = (floorLog2(height)) + TRANSFORM_MATRIX_SHIFT + COM16_C806_TRANS_PREC;
+    CHECK(shift_1st < 0, "Negative shift");
+    CHECK(shift_2nd < 0, "Negative shift");
+    TCoeff *tmp = (TCoeff *)alloca(width * height * sizeof(TCoeff));
+
+    fastFwdTrans1[trTypeHor][transformWidthIndex](block, tmp, shift_1st, height, 0, skipWidth);
+    fastFwdTrans1[trTypeVer][transformHeightIndex](tmp, dstCoeff.buf, shift_2nd, width, skipWidth, skipHeight);
+  }
+  else if (height == 1) //1-D horizontal transform
+  {
+    const int      shift = ((floorLog2(width)) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;
+    CHECK(shift < 0, "Negative shift");
+    CHECKD((transformWidthIndex < 0), "There is a problem with the width.");
+    fastFwdTrans1[trTypeHor][transformWidthIndex](block, dstCoeff.buf, shift, 1, 0, skipWidth);
+  }
+  else //if (iWidth == 1) //1-D vertical transform
+  {
+    int shift = ((floorLog2(height)) + bitDepth + TRANSFORM_MATRIX_SHIFT) - maxLog2TrDynamicRange + COM16_C806_TRANS_PREC;
+    CHECK(shift < 0, "Negative shift");
+    CHECKD((transformHeightIndex < 0), "There is a problem with the height.");
+    fastFwdTrans1[trTypeVer][transformHeightIndex](block, dstCoeff.buf, shift, 1, 0, skipHeight);
+  }
+
+}
+
+#endif
 #endif
 //! \}
+
+
