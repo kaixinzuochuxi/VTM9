@@ -1665,6 +1665,13 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
   if (m_pcEncCfg->getUseRateCtrl())
   {
     (m_pcRateCtrl->getRCPic()->getLCU(ctuRsAddr)).m_actualMSE = (double)bestCS->dist / (double)m_pcRateCtrl->getRCPic()->getLCU(ctuRsAddr).m_numberOfPixel;
+#if yang2019content
+    extern pre_analysis pa;
+    int poc = bestCS->slice[0].getPOC();
+    auto type = pa.ctuType[poc][ctuRsAddr];
+    pa.regionalD[poc][type] += bestCS->dist;
+    pa.regionalD[poc][pre_analysis::TOTAL] += bestCS->dist;
+#endif
   }
 #endif
   // reset context states and uninit context pointer

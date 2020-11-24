@@ -1701,6 +1701,11 @@ void EncApp::pre_analyze()
 #if yang2019content
           pa.cuflag.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
           pa.cuflag.back().resize(pa.TotalCTUNum);
+          pa.ctuType.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.ctuTypeNum.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.ctuTypeNum.back().resize(pre_analysis::TOTAL);
+          pa.regionalD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.regionalD.back().resize(pre_analysis::TOTAL+1);
           //printf("pa.cuflag:%d\n", (int)pa.cuflag.size());
           if (curPOC == 0)
           {

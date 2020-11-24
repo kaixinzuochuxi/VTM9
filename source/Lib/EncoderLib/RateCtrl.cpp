@@ -2967,14 +2967,17 @@ double EncRCPic::estimatePicLambda(list<EncRCPic*>& listPreviousPictures, bool i
     m_LCUs[i].m_bitWeight = BUTargetBits;
   }
 #elif yang2019content
-  ////////// scenechange
+  
   extern pre_analysis pa;
-  pa.scenechange.push_back(pa.check_scenechange(poc));
+  
   ////////// CTU classification
   for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
   {
     pa.CTU_classification(poc, ctuidx);
   }
+
+  ////////// scenechange
+  pa.scenechange.push_back(pa.check_scenechange(poc));
 
   double totalWeight = 0.0;
   // initial BU bit allocation weight

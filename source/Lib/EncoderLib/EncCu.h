@@ -353,6 +353,9 @@ public:
   vector<int> scenechange;
   vector<uint64_t> fd;
   vector<uint64_t> pastD;
+  vector<vector<int>> ctuTypeNum;
+  vector<vector<int>> ctuType;
+  vector<vector<uint64_t>> regionalD;
   enum CTUtype
   {
     TCTU=0,
@@ -607,8 +610,12 @@ public:
     if (a > 35)
     {
       cuflag[fidx][ctuidx] = TCTU;
+      ctuTypeNum[fidx][TCTU] += 1;
+      ctuType[fidx].push_back(TCTU);
       return;
     }
+    uint64_t c10 = 0;
+    uint64_t c64 = 0;
     for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
     {
       for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
@@ -621,24 +628,40 @@ public:
         int w1 = min(CTUsize, framew - x);
         int h1 = min(CTUsize, frameh - y);
         TCoeff* tbuf = (TCoeff*)xMalloc(TCoeff, w1*h1);
-        
-        if (x == xctu && y == yctu)
-          IBCIdx = 0;
-        else if (x == xctu + CTUsize && y == yctu)
-          IBCIdx = 1;
-        else if (x == xctu && y == yctu + CTUsize)
-          IBCIdx = 2;
-        else if (x == xctu + CTUsize && y == yctu + CTUsize)
-          IBCIdx = 3;
+        memset(tbuf, 0, sizeof(TCoeff)*w1*h1);
         CoeffBuf tmp(tbuf, w1, h1);
         transfrom(pre_ana_buf[fidx]->subBuf(x, y, w1, h1), tmp, w1, h1);
-        //mp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
-        //dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, costfun);
+        for (int ty = 0; ty < h1; ty++)
+        {
+          for (int tx = 0; tx < w1; tx++)
+          {
+            if (tx < 10 && ty < 10)
+            {
+              c10 += abs(tmp.at(tx, ty));
+            }
+            c64+= abs(tmp.at(tx, ty));
+            //if(tmp.at(tx, ty)!=0)
+              //printf("%d\t%d\t%d\n", tx, ty, tmp.at(tx, ty));
+          }
+        }
         
         xFree(tbuf);
       }
     }
 
+    double s = c10 / double(c64);
+    if (s <= 0.065)
+    {
+      cuflag[fidx][ctuidx] = SICTU;
+      ctuTypeNum[fidx][SICTU] += 1;
+      ctuType[fidx].push_back(SICTU);
+    }
+    else
+    {
+      cuflag[fidx][ctuidx] = NICTU;
+      ctuTypeNum[fidx][NICTU] += 1;
+      ctuType[fidx].push_back(NICTU);
+    }
     
  
   }

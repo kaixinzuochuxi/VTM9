@@ -493,8 +493,11 @@ private:
   int* m_bitsRatio;
   int* m_GOPID2Level;
   TRCParameter*  m_picPara;
+#if yang2019content
   TRCParameter** m_LCUPara;
-
+#else
+  TRCParameter** m_LCUPara;
+#endif
   int m_framesLeft;
   int64_t m_bitsLeft;
   double m_seqTargetBpp;
