@@ -331,8 +331,8 @@ class pre_analysis
 {
 public:
   
-  
-  int CTUsize = 64;
+  int cfgctusize=0;
+  int CTUsize = 0;
   int framew;
   int frameh;
   RdCost *m_pcRdCost;
@@ -355,14 +355,9 @@ public:
   vector<uint64_t> pastD;
   vector<vector<int>> ctuTypeNum;
   vector<vector<int>> ctuType;
+  vector<vector<double>> typeBAfactor;
   vector<vector<uint64_t>> regionalD;
-  enum CTUtype
-  {
-    TCTU=0,
-    SICTU=1,
-    NICTU=2,
-    TOTAL=3,
-  };
+  
   //0,text,1,SI,2,NI
   vector < vector<int>> cuflag;
   bool inPic(int x, int y, int xoffset, int yoffset)
@@ -496,11 +491,43 @@ public:
           int refpoc = fidx - deltaRefPics1[refidx];
 
           dist1 = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(0, 0, framew, frameh), pre_ana_buf[refpoc]->subBuf(0, 0, framew, frameh), 10, COMPONENT_Y, costfun);
-          dist = dist0 / 2 + dist1 / 2;
+          
         }
-        else
+        
+        int ref0 = fidx - deltaRefPics0[refidx];
+        int ref1 = fidx - deltaRefPics1[refidx];
+        if (numRefPics0 > 0 && numRefPics1 > 0)
+        {
+          dist = dist0 / 2 + dist1 / 2;
+          for (int ct = 0; ct < TOTAL; ct++)
+          {
+            
+            double dd0 = regionalD[ref0][ct] / (double)(regionalD[ref0][TOTAL]+0.0001);
+            double dd1 = regionalD[ref1][ct] / (double)(regionalD[ref1][TOTAL] + 0.0001);
+            typeBAfactor[fidx][ct] = 0.5*dd0 + 0.5*dd1;
+          }
+        }
+        else if (numRefPics0 == 0)
+        {
+          dist = dist1;
+          for (int ct = 0; ct < TOTAL; ct++)
+          {
+
+            
+            double dd1 = regionalD[ref1][ct] / (double)(regionalD[ref1][TOTAL] + 0.0001);
+            typeBAfactor[fidx][ct] = dd1;
+          }
+        }
+        else if (numRefPics1 == 0)
         {
           dist = dist0;
+          for (int ct = 0; ct < TOTAL; ct++)
+          {
+
+            double dd0 = regionalD[ref0][ct] / (double)(regionalD[ref0][TOTAL] + 0.0001);
+            
+            typeBAfactor[fidx][ct] = dd0 ;
+          }
         }
         
 
@@ -551,8 +578,8 @@ public:
     int IBCIdx = 0;
     
     ////////// T-CTU
-    int w = min(128, framew - xctu);
-    int h = min(128, frameh - yctu);
+    int w = min(cfgctusize, framew - xctu);
+    int h = min(cfgctusize, frameh - yctu);
 
     //double a1 = 0;
     double a = 0;
@@ -616,9 +643,9 @@ public:
     }
     uint64_t c10 = 0;
     uint64_t c64 = 0;
-    for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+    for (int y = yctu; y < min(yctu + cfgctusize, frameh); y += CTUsize)
     {
-      for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+      for (int x = xctu; x < min(framew, xctu + cfgctusize); x += CTUsize)
       {
 
         
@@ -667,6 +694,79 @@ public:
   }
 #endif
 
+#if wang2018frame
+  vector<double> ifc;
+  vector<int> iskey;
+  vector<double> avgSATD;
+  void setKey(int fidx)
+  {
+    if (fidx == 0)
+    {
+      ifc[fidx] = 0;
+      iskey[fidx] = 1;
+      return;
+    }
+    const int curCUSize = 16;
+    const int totalCU = ((frameh + curCUSize/2) / curCUSize) * ((framew + curCUSize/2) / curCUSize);
+    int sb = 0;
+    for (int y = 0; y < frameh; y += curCUSize)
+    {
+    
+      for (int x = 0; x < framew; x += curCUSize)
+      {
+        int w = min(curCUSize, framew - x);
+        int h = min(curCUSize, frameh - y);
+        Pel* tbuf = (Pel*)xMalloc(Pel, w*h);
+        memset(tbuf, 0, sizeof(Pel)*w*h);
+        PelBuf tmp(tbuf, w, h);
+     
+        auto dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[fidx-1]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_SAD);
+        if (dist < 2.5*w*h * 4)
+        {
+          sb += 1;
+        }
+      }
+    }
+    ifc[fidx] = sb / (double)totalCU;
+    const double tao = 0.99;
+    iskey[fidx] = ifc[fidx] < 0.99 ? 1 : 0;
+  }
+  void cptSATD(int fidx)
+  {
+    ///// only for LDB
+    
+    const int curCUSize = 32;
+    const int totalCU = ((frameh + curCUSize / 2) / curCUSize) * ((framew + curCUSize / 2) / curCUSize);
+    double satd = 0;
+    for (int y = 0; y < frameh; y += curCUSize)
+    {
+
+      for (int x = 0; x < framew; x += curCUSize)
+      {
+        int w = min(curCUSize, framew - x);
+        int h = min(curCUSize, frameh - y);
+        Distortion dist = 0;
+#if SATDwithCol
+        if (fidx > 0)
+        {        
+          dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[fidx - 1]->subBuf(x, y, w, h), 10, COMPONENT_Y, DF_HAD);
+        }
+        else 
+        {
+          Pel* tbuf = (Pel*)xMalloc(Pel, w*h);
+          memset(tbuf, 0, sizeof(Pel)*w*h);
+          PelBuf tmp(tbuf, w, h);
+          tmp.fill(pre_ana_buf[fidx]->subBuf(x, y, w, h).computeAvg());
+          dist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, DF_HAD);
+        }
+#endif
+        satd += dist;
+      }
+    }
+    avgSATD[fidx] = satd / frameh / framew;
+  }
+
+#endif
 
   pre_analysis() {
     m_size = 0; curidx = 0;
@@ -679,40 +779,40 @@ public:
   void init()
   {
     
-
-    int numx = framew / 128 + ((framew % 128) == 0 ? 0 : 1);
-    int numy = frameh / 128 + ((frameh % 128) == 0 ? 0 : 1);
+    CTUsize = cfgctusize / 2;
+    int numx = framew / cfgctusize + ((framew % cfgctusize) == 0 ? 0 : 1);
+    int numy = frameh / cfgctusize + ((frameh % cfgctusize) == 0 ? 0 : 1);
     TotalCTUNum = numx * numy;
     
     
 
 
-    IBCRef[0][0][0] = -64;
+    IBCRef[0][0][0] = -cfgctusize/2;
     IBCRef[0][0][1] = 0;
-    IBCRef[0][1][0] = -64;
-    IBCRef[0][1][1] = 64;
-    IBCRef[0][2][0] = -128;
-    IBCRef[0][2][1] = 64;
+    IBCRef[0][1][0] = -cfgctusize / 2;
+    IBCRef[0][1][1] = cfgctusize / 2;
+    IBCRef[0][2][0] = -cfgctusize;
+    IBCRef[0][2][1] = cfgctusize / 2;
 
-    IBCRef[1][0][0] = -64;
+    IBCRef[1][0][0] = -cfgctusize / 2;
     IBCRef[1][0][1] = 0;
-    IBCRef[1][1][0] = -128;
-    IBCRef[1][1][1] = 64;
-    IBCRef[1][2][0] = -192;
-    IBCRef[1][2][1] = 64;
+    IBCRef[1][1][0] = -cfgctusize;
+    IBCRef[1][1][1] = cfgctusize / 2;
+    IBCRef[1][2][0] = -3*cfgctusize / 2;
+    IBCRef[1][2][1] = cfgctusize / 2;
 
-    IBCRef[2][0][0] = -64;
+    IBCRef[2][0][0] = -cfgctusize / 2;
     IBCRef[2][0][1] = 0;
     IBCRef[2][1][0] = 0;
-    IBCRef[2][1][1] = -64;
-    IBCRef[2][2][0] = 64;
-    IBCRef[2][2][1] = -64;
+    IBCRef[2][1][1] = -cfgctusize / 2;
+    IBCRef[2][2][0] = cfgctusize / 2;
+    IBCRef[2][2][1] = -cfgctusize / 2;
 
-    IBCRef[3][0][0] = -64;
-    IBCRef[3][0][1] = -64;
+    IBCRef[3][0][0] = -cfgctusize / 2;
+    IBCRef[3][0][1] = -cfgctusize / 2;
     IBCRef[3][1][0] = 0;
-    IBCRef[3][1][1] = -64;
-    IBCRef[3][2][0] = -64;
+    IBCRef[3][1][1] = -cfgctusize / 2;
+    IBCRef[3][2][0] = -cfgctusize / 2;
     IBCRef[3][2][1] = 0;
   }
   void updateCUSATD()
@@ -726,10 +826,10 @@ public:
 
   Position getCTUPos(int ctuidx)
   {
-    int numx = framew / 128 + ((framew % 128) == 0 ? 0 : 1);
-    int numy = frameh / 128 + ((frameh % 128) == 0 ? 0 : 1);
-    int x = ctuidx % numx*128;
-    int y = ctuidx / numx * 128;
+    int numx = framew / cfgctusize + ((framew % cfgctusize) == 0 ? 0 : 1);
+    int numy = frameh / cfgctusize + ((frameh % cfgctusize) == 0 ? 0 : 1);
+    int x = ctuidx % numx*cfgctusize;
+    int y = ctuidx / numx * cfgctusize;
     return Position(x, y);
   }
   void createbuf(int w, int h)
@@ -817,9 +917,9 @@ public:
     int yctu = CTUPos.y;
     int IBCIdx = 0;
     vector<uint64_t> d = { 0,0,0,0 };
-    for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+    for (int y = yctu; y < min(yctu + cfgctusize, frameh); y += CTUsize)
     {
-      for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+      for (int x = xctu; x < min(framew, xctu + cfgctusize); x += CTUsize)
       {
         int w = min(CTUsize, framew - x);
         int h = min(CTUsize, frameh - y);
@@ -855,9 +955,9 @@ public:
     int xctu = CTUPos.x;
     int yctu = CTUPos.y;
     vector<uint64_t> d={0,0,0,0};
-        for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+        for (int y = yctu; y < min(yctu + cfgctusize, frameh); y += CTUsize)
         {
-          for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+          for (int x = xctu; x < min(framew, xctu + cfgctusize); x += CTUsize)
           {
 
             int w = min(CTUsize, framew - x);
@@ -941,9 +1041,9 @@ public:
     //}
     //printf("\n");
     
-    for (int y = yctu; y < min(yctu + 128, frameh); y += CTUsize)
+    for (int y = yctu; y < min(yctu + cfgctusize, frameh); y += CTUsize)
     {
-      for (int x = xctu; x < min(framew, xctu + 128); x += CTUsize)
+      for (int x = xctu; x < min(framew, xctu + cfgctusize); x += CTUsize)
       {
         uint64_t dist = MAX_INT;
         int w = min(CTUsize, framew - x);

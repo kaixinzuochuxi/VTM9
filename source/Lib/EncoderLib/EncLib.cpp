@@ -783,7 +783,10 @@ bool EncLib::encode( const InputColourSpaceConversion snrCSC, std::list<PelUnitB
   iNumEncoded = m_iNumPicRcvd;
   m_iNumPicRcvd = 0;
   m_uiNumAllPicCoded += iNumEncoded;
-
+#if pre_ana
+  extern pre_analysis pa;
+  pa.curidx += m_iGOPSize;
+#endif
   return false;
 }
 

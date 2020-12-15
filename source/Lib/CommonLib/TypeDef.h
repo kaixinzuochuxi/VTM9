@@ -55,12 +55,23 @@
 
 // RC
 #define RlambdaRC 0
-#define SATDRC 1
+#if RlambdaRC==0
+#define modifiedRC 1
+#endif
 
 #define printRCvar 1
 
-#if SATDRC
-#define SWBA 0
+#if modifiedRC
+#define RDmodel 1  // 0,default R-lambda model
+#define GOPlevelBA 0 // 0,default,1,SWBA
+#define FramelevelBA 0  // 0,default
+#define FramelevelCP 0
+#define CTUlevelBA 0
+#define CTUlevelCP 0
+#define FramelevelUpdate 1
+#define CTUlevelUpdate 1
+
+//#define SWBA 0
 #define RIrefine 0
 #define RIUpdateWithActual 0
 #define updateBAwithClipLambda 0
@@ -68,9 +79,25 @@
 #define weight_cu_satd 0
 //#undef pre_ana
 //#define pre_ana 1
+
+#define yang2019content 0
+#define wang2018frame 0
+#if wang2018frame
+#define SATDwithCol 1 /////1, compute satd with colocated blocks; else directly compute satd with zero pixel value;
+#endif
+#if yang2019content
+enum CTUtypes
+{
+  TCTU = 0,
+  SICTU = 1,
+  NICTU = 2,
+  TOTAL = 3,
+};
+#endif
 #endif
 
-#define yang2019content 1
+
+
 // build cu tree, print CU level information
 #define build_cu_tree 0
 /////

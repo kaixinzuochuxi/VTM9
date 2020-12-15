@@ -374,7 +374,7 @@ private:
 
 
 
-#elif SATDRC
+#elif modifiedRC
 #include "EncoderLib/EncCu.h"
 #include <numeric>
 const int g_RCInvalidQPValue = -999;
@@ -391,10 +391,6 @@ const double g_RCAlphaMaxValue = 500.0;
 const double g_RCBetaMinValue = -3.0;
 const double g_RCBetaMaxValue = -0.1;
 
-#define ALPHA     6.7542;
-#define BETA1     1.2517
-#define BETA2     1.7860
-
 struct TRCLCU
 {
   int m_actualBits;
@@ -409,6 +405,12 @@ struct TRCLCU
   double m_actualMSE;
 };
 
+#if RDmodel==0
+#define ALPHA     6.7542;
+#define BETA1     1.2517
+#define BETA2     1.7860
+
+
 struct TRCParameter
 {
   double m_alpha;
@@ -416,6 +418,21 @@ struct TRCParameter
   int    m_validPix;
   double m_skipRatio;
 };
+#elif RDmodel==1
+#define THETAI     0.0441/8
+#define THETAB     0.0556/8
+//#define THETAI     0.0370
+//#define THETAB     0.0471
+
+struct TRCParameter
+{
+  double m_theta;
+  //double m_satd;
+  int    m_validPix;
+  double m_skipRatio;
+};
+#endif
+
 
 class EncRCSeq
 {
@@ -429,7 +446,11 @@ public:
   void initBitsRatio(int bitsRatio[]);
   void initGOPID2Level(int GOPID2Level[]);
   void initPicPara(TRCParameter* picPara = NULL);    // NULL to initial with default value
+#if yang2019content
+  void initLCUPara(TRCParameter*** LCUPara = NULL);    // NULL to initial with default value
+#else
   void initLCUPara(TRCParameter** LCUPara = NULL);    // NULL to initial with default value
+#endif
   void updateAfterPic(int bits);
   void setAllBitRatio(double basicLambda, double* equaCoeffA, double* equaCoeffB);
 
@@ -457,11 +478,17 @@ public:
   TRCParameter*  getPicPara() { return m_picPara; }
   TRCParameter   getPicPara(int level) { CHECK(!(level < m_numberOfLevel), "Level too big"); return m_picPara[level]; }
   void           setPicPara(int level, TRCParameter para) { CHECK(!(level < m_numberOfLevel), "Level too big"); m_picPara[level] = para; }
+#if yang2019content
+  TRCParameter*** getLCUPara() { return m_LCUPara; }
+  TRCParameter*  getLCUPara(int level, CTUtypes ct) { CHECK(!(level < m_numberOfLevel), "Level too big"); return m_LCUPara[level][ct]; }
+  TRCParameter   getLCUPara(int level, CTUtypes ct,int LCUIdx) { CHECK(!(LCUIdx < m_numberOfLCU), "LCU id exceeds number of LCU"); return getLCUPara(level,ct)[LCUIdx]; }
+  void           setLCUPara(int level, CTUtypes ct,int LCUIdx, TRCParameter para) { CHECK(!(level < m_numberOfLevel), "Level too big"); CHECK(!(LCUIdx < m_numberOfLCU), "LCU id exceeds number of LCU"); m_LCUPara[level][ct][LCUIdx] = para; }
+#else
   TRCParameter** getLCUPara() { return m_LCUPara; }
   TRCParameter*  getLCUPara(int level) { CHECK(!(level < m_numberOfLevel), "Level too big"); return m_LCUPara[level]; }
   TRCParameter   getLCUPara(int level, int LCUIdx) { CHECK(!(LCUIdx < m_numberOfLCU), "LCU id exceeds number of LCU"); return getLCUPara(level)[LCUIdx]; }
   void           setLCUPara(int level, int LCUIdx, TRCParameter para) { CHECK(!(level < m_numberOfLevel), "Level too big"); CHECK(!(LCUIdx < m_numberOfLCU), "LCU id exceeds number of LCU"); m_LCUPara[level][LCUIdx] = para; }
-
+#endif
   int  getFramesLeft() { return m_framesLeft; }
   int64_t  getBitsLeft() { return m_bitsLeft; }
 
@@ -494,7 +521,7 @@ private:
   int* m_GOPID2Level;
   TRCParameter*  m_picPara;
 #if yang2019content
-  TRCParameter** m_LCUPara;
+  TRCParameter*** m_LCUPara;
 #else
   TRCParameter** m_LCUPara;
 #endif
@@ -512,6 +539,12 @@ private:
 public:
   int totalSWbits;
   int SWbitsLeft;
+#if wang2018frame
+  double R_k_real;
+  double R_k_comp;
+  double R_nk_real;
+  double R_nk_comp;
+#endif
 };
 
 class EncRCGOP
@@ -527,9 +560,13 @@ public:
 
 private:
   int  xEstGOPTargetBits(EncRCSeq* encRCSeq, int GOPSize);
+#if RDmodel==0
   void   xCalEquaCoeff(EncRCSeq* encRCSeq, double* lambdaRatio, double* equaCoeffA, double* equaCoeffB, int GOPSize);
   double xSolveEqua(EncRCSeq* encRCSeq, double targetBpp, double* equaCoeffA, double* equaCoeffB, int GOPSize);
-
+#elif RDmodel==1
+  void   xCalEquaCoeff(EncRCSeq* encRCSeq, double* lambdaRatio, double* equaCoeffA, double* equaCoeffB, int GOPSize);
+  double xSolveEqua(EncRCSeq* encRCSeq, double targetBpp, double* equaCoeffA, double* equaCoeffB, int GOPSize);
+#endif
 public:
   EncRCSeq* getEncRCSeq() { return m_encRCSeq; }
   int  getNumPic() { return m_numPic; }
@@ -566,7 +603,7 @@ public:
   double calculateLambdaIntra(double alpha, double beta, double MADPerPixel, double bitsPerPixel);
   double estimatePicLambda(list<EncRCPic*>& listPreviousPictures, bool isIRAP);
 
-  void   updateAlphaBetaIntra(double *alpha, double *beta);
+  
 
   double getLCUTargetBpp(bool isIRAP);
   double getLCUEstLambdaAndQP(double bpp, int clipPicQP, int *estQP);
@@ -574,10 +611,15 @@ public:
   int    getLCUEstQP(double lambda, int clipPicQP);
   void updateAfterCTU(int LCUIdx, int bits, int QP, double lambda, double skipRatio, bool updateLCUParameter = true);
   void updateAfterPicture(int actualHeaderBits, int actualTotalBits, double averageQP, double averageLambda, bool isIRAP);
-
+#if RDmodel==0
   double clipRcAlpha(const int bitdepth, const double alpha);
   double clipRcBeta(const double beta);
-
+  void   updateAlphaBetaIntra(double *alpha, double *beta);
+#elif RDmodel==1
+  double clipRcAlpha(const int bitdepth, const double alpha);
+  double clipRcBeta(const double beta);
+  void   updateAlphaBetaIntra(double *alpha, double *beta);
+#endif
   void addToPictureLsit(list<EncRCPic*>& listPreviousPictures);
   double calAverageQP();
   double calAverageLambda();
@@ -654,9 +696,13 @@ private:
   double m_picLambda;
   double m_picMSE;
   int m_validPixelsInPic;
-#if SATDRC
+#if modifiedRC
   public:
   int poc;
+#if RDmodel==1
+  double avgsatd;
+  vector<double> ctusatd;
+#endif
 #endif
 };
 

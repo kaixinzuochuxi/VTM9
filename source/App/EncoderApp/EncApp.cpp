@@ -1591,42 +1591,9 @@ void EncApp::pre_analyze()
       }
     }
 
-    //if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
-        //{
-        //  pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-        //  pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-        //  pa.CUSATD.back().resize(pa.TotalCTUNum);
-        //  int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
 
 
-        //  int rplidx = CalRPLIdxRA(curPOC);
-        //  printf("curPOC:%d\trplidx:%d\n", curPOC, rplidx);
-
-
-
-        //  //for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
-        //  //{
-
-        //  //  vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
-        //  //  if (curPOC != 0)
-        //  //  {
-
-        //  //    dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[rplidx], m_RPLList1[rplidx]);
-        //  //  }
-        //  //  auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
-        //  //  auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
-        //  //  for (int cuidx = 0; cuidx < 4; cuidx++)
-        //  //  {
-
-        //  //    pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
-        //  //    //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
-        //  //    int x = 0;
-        //  //  }
-        //  //  int x = 0;
-        //  //}
-        //}
-
-  
+  ///// LDB
   else if (m_iIntraPeriod == -1)
   {
     int num_pre_ana = 0;
@@ -1642,6 +1609,7 @@ void EncApp::pre_analyze()
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
       num_pre_ana = min(m_cEncLib.getFramesToBeEncoded(), num_pre_ana);
       pa.m_size = num_pre_ana;
+      pa.cfgctusize = m_uiCTUSize;
       pa.init();
       pa.swEndIdx = pa.curidx + num_pre_ana;
     }
@@ -1698,14 +1666,25 @@ void EncApp::pre_analyze()
           //{
           //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
           //}
+#if wang2018frame
+          pa.ifc.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.iskey.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.avgSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          int curidx = m_cEncLib.m_iPOCLast + 1 + fidx;
+          pa.setKey(curidx);
+          pa.cptSATD(curidx);
+#endif
 #if yang2019content
           pa.cuflag.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
           pa.cuflag.back().resize(pa.TotalCTUNum);
           pa.ctuType.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
           pa.ctuTypeNum.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.ctuTypeNum.back().resize(pre_analysis::TOTAL);
+          pa.ctuTypeNum.back().resize(TOTAL);
           pa.regionalD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.regionalD.back().resize(pre_analysis::TOTAL+1);
+          pa.regionalD.back().resize(TOTAL+1);
+          pa.typeBAfactor.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          pa.typeBAfactor.back().resize(TOTAL);
+          
           //printf("pa.cuflag:%d\n", (int)pa.cuflag.size());
           if (curPOC == 0)
           {

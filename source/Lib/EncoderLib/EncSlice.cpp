@@ -1682,7 +1682,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       }
 
       pRateCtrl->setRCQP( estQP );
-#elif SATDRC
+#elif modifiedRC
       int estQP = pcSlice->getSliceQp();
       double estLambda = -1.0;
       double bpp = -1.0;
@@ -1694,6 +1694,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       else
       {
         bpp = pRateCtrl->getRCPic()->getLCUTargetBpp(pcSlice->isIRAP());
+#if CTUlevelCP==0
         if (pcPic->slices[0]->isIRAP())
         {
           estLambda = pRateCtrl->getRCPic()->getLCUEstLambdaAndQP(bpp, pcSlice->getSliceQp(), &estQP);
@@ -1705,7 +1706,11 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
         }
 
         estQP = Clip3(-pcSlice->getSPS()->getQpBDOffset(CHANNEL_TYPE_LUMA), MAX_QP, estQP);
+#endif
 
+#if printRCvar
+        printf("CTU: satd:%.2f\tlambda:%.2f\tQP:%d\n", pRateCtrl->getRCPic()->ctusatd[ctuIdx] / pRateCtrl->getRCPic()->getLCU(ctuIdx).m_numberOfPixel, estLambda, estQP);
+#endif
         pRdCost->setLambda(estLambda, pcSlice->getSPS()->getBitDepths());
 #if WCG_EXT
         pRdCost->saveUnadjustedLambda();
@@ -1835,7 +1840,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       pRdCost->setLambda(oldLambda, pcSlice->getSPS()->getBitDepths());
       pRateCtrl->getRCPic()->updateAfterCTU(pRateCtrl->getRCPic()->getLCUCoded(), actualBits, actualQP, actualLambda, skipRatio,
         pcSlice->isIRAP() ? 0 : pCfg->getLCULevelRC());
-#elif SATDRC
+#elif modifiedRC
       int actualQP = g_RCInvalidQPValue;
       double actualLambda = pRdCost->getLambda();
       int numberOfEffectivePixels = 0;
