@@ -2267,11 +2267,20 @@ void EncRCSeq::initPicPara(TRCParameter* picPara)
       }
       else
       {
+        double theta;
+        if (getPicHeight()*getPicWidth() >= 1920 * 1080)
+        {
+          theta = THETAI2;
+        }
+        else
+        {
+          theta = THETAI1;
+        }
         int bitdepth_luma_scale =
           2
           * (m_bitDepth - 8
             - DISTORTION_PRECISION_ADJUSTMENT(m_bitDepth));
-        m_picPara[i].m_theta = pow(2.0, bitdepth_luma_scale) * THETAI;
+        m_picPara[i].m_theta = pow(2.0, bitdepth_luma_scale) * theta;
         
       }
     }

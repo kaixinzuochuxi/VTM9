@@ -72,7 +72,7 @@
 #define CTUlevelUpdate 1
 
 //#define SWBA 0
-#define RIrefine 0
+#define RIrefine 0  // 0,default, refine bits for I, 1, donot refine
 #define RIUpdateWithActual 0
 #define updateBAwithClipLambda 0
 #define weight_frame_satd 0

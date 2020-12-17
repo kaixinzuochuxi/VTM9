@@ -1683,6 +1683,52 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
 
       pRateCtrl->setRCQP( estQP );
 #elif modifiedRC
+#if RDmodel==0
+      int estQP = pcSlice->getSliceQp();
+      double estLambda = -1.0;
+      double bpp = -1.0;
+
+      if ((pcPic->slices[0]->isIRAP() && pCfg->getForceIntraQP()) || !pCfg->getLCULevelRC())
+      {
+        estQP = pcSlice->getSliceQp();
+      }
+      else
+      {
+        bpp = pRateCtrl->getRCPic()->getLCUTargetBpp(pcSlice->isIRAP());
+#if CTUlevelCP==0
+        if (pcPic->slices[0]->isIRAP())
+        {
+          estLambda = pRateCtrl->getRCPic()->getLCUEstLambdaAndQP(bpp, pcSlice->getSliceQp(), &estQP);
+        }
+        else
+        {
+          estLambda = pRateCtrl->getRCPic()->getLCUEstLambda(bpp);
+          estQP = pRateCtrl->getRCPic()->getLCUEstQP(estLambda, pcSlice->getSliceQp());
+        }
+
+        estQP = Clip3(-pcSlice->getSPS()->getQpBDOffset(CHANNEL_TYPE_LUMA), MAX_QP, estQP);
+#endif
+
+#if printRCvar
+        printf("lambda:%.2f\tQP:%d\n", estLambda, estQP);
+#endif
+        pRdCost->setLambda(estLambda, pcSlice->getSPS()->getBitDepths());
+#if WCG_EXT
+        pRdCost->saveUnadjustedLambda();
+#endif
+
+#if RDOQ_CHROMA_LAMBDA
+        const double lambdaArray[MAX_NUM_COMPONENT] = { estLambda / m_pcRdCost->getDistortionWeight(COMPONENT_Y),
+                                                       estLambda / m_pcRdCost->getDistortionWeight(COMPONENT_Cb),
+                                                       estLambda / m_pcRdCost->getDistortionWeight(COMPONENT_Cr) };
+        pTrQuant->setLambdas(lambdaArray);
+#else
+        pTrQuant->setLambda(estLambda);
+#endif
+      }
+
+      pRateCtrl->setRCQP(estQP);
+#elif RDmodel==1
       int estQP = pcSlice->getSliceQp();
       double estLambda = -1.0;
       double bpp = -1.0;
@@ -1727,6 +1773,7 @@ void EncSlice::encodeCtus( Picture* pcPic, const bool bCompressEntireSlice, cons
       }
 
       pRateCtrl->setRCQP(estQP);
+#endif
 #endif
     }
 #if ENABLE_QPA

@@ -419,8 +419,10 @@ struct TRCParameter
   double m_skipRatio;
 };
 #elif RDmodel==1
-#define THETAI     0.0441/8
-#define THETAB     0.0556/8
+#define THETAI1     0.0441/1.25
+#define THETAI2     0.0441/1.75
+//#define THETAB     0.0556
+#define THETAB     0.0441*1.75
 //#define THETAI     0.0370
 //#define THETAB     0.0471
 

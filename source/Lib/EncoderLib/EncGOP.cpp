@@ -1881,9 +1881,9 @@ else if (frameLevel == 0)   // intra case, but use the model
     int bits = m_pcRateCtrl->getRCPic()->getTargetBits();
 #else
     int bits = m_pcRateCtrl->getRCSeq()->getLeftAverageBits();
-#endif
-    bits = m_pcRateCtrl->getRCPic()->getRefineBitsForIntra(bits);
 
+    bits = m_pcRateCtrl->getRCPic()->getRefineBitsForIntra(bits);
+#endif
 #if U0132_TARGET_BITS_SATURATION
     if (m_pcRateCtrl->getCpbSaturationEnabled())
     {
