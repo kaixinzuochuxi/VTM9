@@ -47,8 +47,8 @@
 #include "EncoderLib/EncLibCommon.h"
 
 #if pre_ana
-#include "EncoderLib/RateCtrl.h"
-#include "EncoderLib/EncCu.h"
+//#include "EncoderLib/RateCtrl.h"
+//#include "EncoderLib/EncCu.h"
 #endif
 using namespace std;
 

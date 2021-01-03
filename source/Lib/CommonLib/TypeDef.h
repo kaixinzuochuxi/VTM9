@@ -51,25 +51,31 @@
 #include <cassert>
 
 // self define macro
-#define pre_ana 1
+#define pre_ana 0
+
+#define debugRCAI 1
 
 // RC
-#define RlambdaRC 0
+#define RlambdaRC 1
 #if RlambdaRC==0
 #define modifiedRC 1
 #endif
 
-#define printRCvar 1
+#define printRCvar 0
+
+
 
 #if modifiedRC
-#define RDmodel 1  // 0,default R-lambda model
+#define RDmodel 0  // 0,default R-lambda model
 #define GOPlevelBA 0 // 0,default,1,SWBA
 #define FramelevelBA 0  // 0,default
 #define FramelevelCP 0
 #define CTUlevelBA 0
 #define CTUlevelCP 0
-#define FramelevelUpdate 1
-#define CTUlevelUpdate 1
+#define FramelevelUpdate 0
+#define CTUlevelUpdate 0
+
+#define debugbuffer 1
 
 //#define SWBA 0
 #define RIrefine 0  // 0,default, refine bits for I, 1, donot refine
@@ -103,18 +109,18 @@ enum CTUtypes
 /////
 #if build_cu_tree 
 //cfg 
-#define disableintraininter 1
-#define predfromori 1
+#define disableintraininter 0
+#define predfromori 0
 #define disablefast 0
 // output
 #define outputjson 1
 #define simplify20200506 0
-#define simplify20200718 1
+#define simplify20200718 0
 #define printall 1
 #define printchormacu 0
 #define printresirec 0
 #define preddist 0
-#define meansatd 1
+#define meansatd 0
 
 #if predfromori
 #define keepbestoricost 0
@@ -123,6 +129,26 @@ enum CTUtypes
 #endif
 #endif
 #endif
+#define printqplambda 1
+#define UsePipe 0
+#if UsePipe
+#define Pframelevel 1
+#define Pctulevel 1
+
+#endif
+#define iswindows 1 //0, linux,1,windows
+#if UsePipe
+#define NOMINMAX
+//#define NOERROR
+#if iswindows
+#include <Windows.h>
+#ifdef ERROR
+#undef ERROR
+#endif
+#define PBUFSIZE 256
+#endif
+#endif
+
 
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_R0058                                        1 // JVET-R0058: the combination of RPR, subpictures, and scalability 
@@ -1262,6 +1288,7 @@ enum MsgLevel
   VERBOSE = 5,
   DETAILS = 6
 };
+#pragma once
 enum RESHAPE_SIGNAL_TYPE
 {
   RESHAPE_SIGNAL_SDR = 0,

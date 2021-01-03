@@ -58,6 +58,7 @@
 
 
 
+
 //! \ingroup EncoderLib
 //! \{
 
@@ -342,17 +343,14 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
   if (cs.slice->getPOC() > 0)
 #endif
   {
-    //char *s[] = {
-//    vector<string>s = {
-//    "MODE_INTER" ,     ///< inter-prediction mode
-//    "MODE_INTRA" ,     ///< intra-prediction mode
-//#if JVET_M0483_IBC
-//    "MODE_IBC",     ///< ibc-prediction mode
-//    "NUMBER_OF_PREDICTION_MODES" ,
-//#else
-//    NUMBER_OF_PREDICTION_MODES ,
-//#endif
-//    };
+    char *s[] = {
+    //vector<string>s = {
+  "MODE_INTER" ,     ///< inter-prediction mode
+  "MODE_INTRA" ,     ///< intra-prediction mode
+  "MODE_IBC" ,     ///< ibc-prediction mode
+  "MODE_PLT" ,     ///< plt-prediction mode
+  "NUMBER_OF_PREDICTION_MODES" ,
+    };
     //for (auto pu : bestCS->pus)
     //{
     //  printf("(%4d* %4d* %4d* %4d*) %s intraDir:%2d interDir:%3d skip:%d merge:%d mergeIdx:%3d affine:%d\tmhIntraFlag:%d\t (MV: %d %d\t%d %d) (ref: %d %d)\n",
@@ -983,76 +981,80 @@ void EncCu::compressCtu( CodingStructure& cs, const UnitArea& area, const unsign
       printf("}");
 #else
 
-      printf("{ \"intradist\":%ju, \"interdist\":%ju, \"intrabits\":%ju ,\"interbits\":%ju, \"distwithrec\":%ju  ",
-        pu->intradist, pu->interdist, pu->intrabits, pu->interbits, pu->D_currecwoilf_curori_refrec);
-#if preddist
-      printf(", \"orisigma\":%.2f, \"refsigma0\":%.2f ,\"refsigma1\":%.2f, \"SSEY_refrec_curori_0\":%.2f, \"SSEY_refrec_curori_1\":%.2f",
-        pu->orisigma, pu->refsigma0, pu->refsigma1, pu->D_refrec_curori_0, pu->D_refrec_curori_1);
-#endif
-#if predfromori
-      printf(" ,\"interdistori\":%ju,  \"interbitsori\":%ju, \"distwithori\":%ju ",
-        pu->interdistori, pu->interbitsori, pu->D_currecwoilf_curori_refori);
-#if preddist
-      printf(" , \"reforisigma0\":%.2f, \"reforisigma1\":%.2f, \"SSEY_refori_curori_0\":%.2f, \"SSEY_refori_curori_1\":%.2f ",
-        pu->reforisigma0, pu->reforisigma1, pu->SSEY_refori_curori_0, pu->SSEY_refori_curori_1);
-#endif
-
-#endif
+//      printf("{ \"intradist\":%ju, \"interdist\":%ju, \"intrabits\":%ju ,\"interbits\":%ju, \"distwithrec\":%ju  ",
+//        pu->intradist, pu->interdist, pu->intrabits, pu->interbits, pu->D_currecwoilf_curori_refrec);
+//#if preddist
+//      printf(", \"orisigma\":%.2f, \"refsigma0\":%.2f ,\"refsigma1\":%.2f, \"SSEY_refrec_curori_0\":%.2f, \"SSEY_refrec_curori_1\":%.2f",
+//        pu->orisigma, pu->refsigma0, pu->refsigma1, pu->D_refrec_curori_0, pu->D_refrec_curori_1);
+//#endif
+//#if predfromori
+//      printf(" ,\"interdistori\":%ju,  \"interbitsori\":%ju, \"distwithori\":%ju ",
+//        pu->interdistori, pu->interbitsori, pu->D_currecwoilf_curori_refori);
+//#if preddist
+//      printf(" , \"reforisigma0\":%.2f, \"reforisigma1\":%.2f, \"SSEY_refori_curori_0\":%.2f, \"SSEY_refori_curori_1\":%.2f ",
+//        pu->reforisigma0, pu->reforisigma1, pu->SSEY_refori_curori_0, pu->SSEY_refori_curori_1);
+//#endif
+//
+//#endif
+      //printf(" } | ");
       // parameter
       //printf("\t QP:%d lambda:%f | ", pu->cu->qp, m_pcRdCost->getLambda());
-      printf(" } | { ");
+      printf(" { ");
       // mode
-      printf(" \"affine\":%d,\"imv\":%d,\"affinetype\":%d,\"skip\":%d,\"cbf\":%d,\"mhintra\":%d,\"triangle\":%d,\"merge\":%d,\"mergeidx\":%d,\"gbi\":%d,\"intradir\":[%u,%u],\"multiRefIdx\":%d   ",
-        pu->cu->affine,
-        pu->cu->imv,
-        pu->cu->affineType,
-        pu->cu->skip,
-        pu->cu->rootCbf,
-        pu->mhIntraFlag,
-        pu->cu->triangle,
-        pu->mergeFlag,
-        pu->mergeIdx,
-        pu->cu->GBiIdx,
+      printf(" \"predmode\":%d ", pu->cu->predMode);
+      
+      //printf(" \"affine\":%d,\"imv\":%d,\"affinetype\":%d,\"skip\":%d,\"cbf\":%d,\"mhintra\":%d,\"triangle\":%d,\"merge\":%d,\"mergeidx\":%d,\"intradir\":[%u,%u],\"multiRefIdx\":%d   ",
+      //  pu->cu->affine,
+      //  pu->cu->imv,
+      //  pu->cu->affineType,
+      //  pu->cu->skip,
+      //  pu->cu->rootCbf,
+      //  pu->ciipFlag,
+      //  pu->cu->geoFlag,
+      //  pu->mergeFlag,
+      //  pu->mergeIdx,
+      //  
 
-        pu->intraDir[0],
-        pu->intraDir[1],
-        pu->multiRefIdx
-      );
-      printf(" ,\"mv\":[%d,%d,%d,%d], \"affinemv\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d] ",
-        pu->mv[0].hor,
-        pu->mv[0].ver,
-        pu->mv[1].hor,
-        pu->mv[1].ver,
-        pu->mvAffi[0][0].hor,
-        pu->mvAffi[0][0].ver,
-        pu->mvAffi[0][1].hor,
-        pu->mvAffi[0][1].ver,
-        pu->mvAffi[0][2].hor,
-        pu->mvAffi[0][2].ver,
-        pu->mvAffi[1][0].hor,
-        pu->mvAffi[1][0].ver,
-        pu->mvAffi[1][1].hor,
-        pu->mvAffi[1][1].ver,
-        pu->mvAffi[1][2].hor,
-        pu->mvAffi[1][2].ver
+      //  pu->intraDir[0],
+      //  pu->intraDir[1],
+      //  pu->multiRefIdx
+      //);
+      //printf(" ,\"mv\":[%d,%d,%d,%d], \"affinemv\":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d] ",
+      //  pu->mv[0].hor,
+      //  pu->mv[0].ver,
+      //  pu->mv[1].hor,
+      //  pu->mv[1].ver,
+      //  pu->mvAffi[0][0].hor,
+      //  pu->mvAffi[0][0].ver,
+      //  pu->mvAffi[0][1].hor,
+      //  pu->mvAffi[0][1].ver,
+      //  pu->mvAffi[0][2].hor,
+      //  pu->mvAffi[0][2].ver,
+      //  pu->mvAffi[1][0].hor,
+      //  pu->mvAffi[1][0].ver,
+      //  pu->mvAffi[1][1].hor,
+      //  pu->mvAffi[1][1].ver,
+      //  pu->mvAffi[1][2].hor,
+      //  pu->mvAffi[1][2].ver
 
-      );
-      printf(" ,\"interdir\":%d, \"refidx\":[%d,%d],\"refpoc\":[ ", pu->interDir, pu->refIdx[0], pu->refIdx[1]);
-      for (int iRefList = 0; iRefList < 2; iRefList++)
-      {
-        printf(" [ ");
-        for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
-        {
-          if (iRefIndex != 0)
-            printf(",");
-          printf("%d", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
+      //);
+      //printf(" ,\"interdir\":%d, \"refidx\":[%d,%d],\"refpoc\":[ ", pu->interDir, pu->refIdx[0], pu->refIdx[1]);
+      //for (int iRefList = 0; iRefList < 2; iRefList++)
+      //{
+      //  printf(" [ ");
+      //  for (int iRefIndex = 0; iRefIndex < bestCS->slice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
+      //  {
+      //    if (iRefIndex != 0)
+      //      printf(",");
+      //    printf("%d", bestCS->slice->getRefPOC(RefPicList(iRefList), iRefIndex) - bestCS->slice->getLastIDR());
 
-        }
-        printf(" ]");
-        if (iRefList == 0)
-          printf(",");
-      }
-      printf("] }");
+      //  }
+      //  printf(" ]");
+      //  if (iRefList == 0)
+      //    printf(",");
+      //}
+      //printf("] ");
+      printf(" } ");
 #endif
 #else
       printf("intradist:%ju interdist:%ju intrabits:%ju interbits:%ju orisigma:%.2f refsigma0:%.2f refsigma1:%.2f D_refrec_curori_0:%.2f D_refrec_curori_1:%.2f ",
@@ -2998,8 +3000,8 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
             }
             validCandRet = m_pcIntraSearch->estIntraPredLumaQT(cu, partitioner, bestCostSoFar, mtsFlag, startMTSIdx[trGrpIdx], endMTSIdx[trGrpIdx], (trGrpIdx > 0), !cu.colorTransform ? bestCS : nullptr);
 #if build_cu_tree
-            auto intradist = tempCS->dist;
-            auto intrabits = tempCS->fracBits;
+            //auto intradist = tempCS->dist;
+            //auto intrabits = tempCS->fracBits;
 #endif
             
             if ((!validCandRet || (cu.ispMode && cu.firstTU->cbf[COMPONENT_Y] == 0)))
@@ -6148,6 +6150,78 @@ void pre_analysis::transfrom(const CPelBuf & resi, CoeffBuf & dstCoeff, const in
 }
 
 #endif
+#endif
+
+#if UsePipe
+//#if iswindows
+//class usingpipe
+//{
+//  string pip_name;
+//  char ReadBuf[PBUFSIZE];
+//  char SendBuf[PBUFSIZE];
+//  HANDLE h_Pipe;
+//  vector<double> codingpara = {0,0};
+//  vector<double> state_and_reward = {0,0};
+//  usingpipe();
+//
+//  void init(string pipdir) { pip_name.empty(); pip_name += pipdir; };
+//  bool isexist() { return WaitNamedPipe(TEXT(pip_name.c_str()), NMPWAIT_WAIT_FOREVER); }
+//  bool create_handle()
+//  {
+//     h_Pipe = CreateFile(						//管道属于一种特殊的文件
+//      TEXT("\\\\.\\Pipe\\mypipe"),				//文件名字
+//      GENERIC_READ | GENERIC_WRITE,				//文件模式
+//      //0,											//是否共享
+//      FILE_SHARE_READ | FILE_SHARE_WRITE,
+//      NULL,
+//      OPEN_EXISTING,
+//      FILE_ATTRIBUTE_NORMAL,						//文件属性(只读，默认...)NORMAL 为默认属性
+//      //FILE_FLAG_OVERLAPPED,
+//      NULL);
+//    return h_Pipe != INVALID_HANDLE_VALUE;
+//  }
+//  bool write() { return WriteFile(h_Pipe, SendBuf, sizeof(SendBuf), 0, 0); }
+//  bool read() { return ReadFile(h_Pipe, ReadBuf, sizeof(ReadBuf), 0, 0);  }
+//  bool encode(vector<double> vc) 
+//  {
+//    std::stringstream buf;
+//    buf.precision(2);//覆盖默认精度
+//    buf.setf(std::ios::fixed);//保留小数位
+//    for(int i=0;i<vc.size();i++)
+//    {
+//      buf << vc[i] << " ";
+//    }
+//    
+//    std::string str1;
+//    str1 = buf.str();
+//    strcpy(SendBuf, str1.c_str());
+//  }
+//  bool decode(vector<double> vc) 
+//  {
+//    char* d = " ";
+//    char *p = strtok(ReadBuf, d);
+//    int i = 0;
+//    while (p) {
+//      string s = p; //分割得到的字符串转换为string类型
+//      vc[i]=atoi(s.c_str()); //存入结果数组
+//      p = strtok(NULL, d);
+//    }
+//  }
+//
+//};
+//#endif
+
+#if Pframelevel
+#if iswindows
+usingpipe pipefl;
+#endif
+#endif
+#if Pctulevel
+#if iswindows
+usingpipe pipectul;
+#endif
+#endif
+
 #endif
 //! \}
 

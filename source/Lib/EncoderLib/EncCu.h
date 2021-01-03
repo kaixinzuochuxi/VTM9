@@ -61,6 +61,11 @@
 #include "CommonLib/TrQuant_EMT.h"
 #include <numeric>
 #endif
+#if UsePipe
+#if iswindows
+#include "CommonLib/TypeDef.h"
+#endif
+#endif
 //! \ingroup EncoderLib
 //! \{
 
@@ -1122,5 +1127,69 @@ public:
 
 
 #endif
+
+#if UsePipe
+#if iswindows
+class usingpipe
+{
+public:
+  string pip_name;
+  char ReadBuf[PBUFSIZE];
+  char SendBuf[PBUFSIZE];
+  HANDLE h_Pipe;
+  vector<double> action = { 0,0 }; // 0, QP, 1, lambda
+  vector<double> state_and_reward = { 0,0 };
+  usingpipe() {};
+
+  void init(string pipdir) { pip_name.empty(); pip_name += pipdir; };
+  bool isexist() { return WaitNamedPipe(TEXT(pip_name.c_str()), NMPWAIT_WAIT_FOREVER); }
+  bool create_handle()
+  {
+    h_Pipe = CreateFile(						//管道属于一种特殊的文件
+      TEXT(pip_name.c_str()),				//文件名字
+      GENERIC_READ | GENERIC_WRITE,				//文件模式
+      //0,											//是否共享
+      FILE_SHARE_READ | FILE_SHARE_WRITE,
+      NULL,
+      OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL,						//文件属性(只读，默认...)NORMAL 为默认属性
+      //FILE_FLAG_OVERLAPPED,
+      NULL);
+    return h_Pipe != INVALID_HANDLE_VALUE;
+  }
+  bool write() { return WriteFile(h_Pipe, SendBuf, sizeof(SendBuf), 0, 0); }
+  bool read() { return ReadFile(h_Pipe, ReadBuf, sizeof(ReadBuf), 0, 0); }
+  void encode()
+  {
+    std::stringstream buf;
+    buf.precision(2);//覆盖默认精度
+    buf.setf(std::ios::fixed);//保留小数位
+    for (int i = 0; i < state_and_reward.size(); i++)
+    {
+      buf << state_and_reward[i] << " ";
+    }
+
+    std::string str1;
+    str1 = buf.str();
+    strcpy(SendBuf, str1.c_str());
+  }
+  void decode()
+  {
+    char* d = " ";
+    char *p = strtok(ReadBuf, d);
+    int i = 0;
+    while (p) {
+      string s = p; //分割得到的字符串转换为string类型
+      action[i] = atoi(s.c_str()); //存入结果数组
+      p = strtok(NULL, d);
+      i += 1;
+    }
+  }
+
+};
+#endif
+#endif
+
+
 
 #endif // __ENCMB__

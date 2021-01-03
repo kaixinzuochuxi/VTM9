@@ -2931,6 +2931,21 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     {
       m_pcSliceEncoder->setJointCbCrModes(*pcPic->cs, Position(0, 0), pcPic->cs->area.lumaSize());
     }
+#if UsePipe && Pframelevel
+#if iswindows
+    extern usingpipe pipefl;
+    pipefl.encode();
+    if (!pipefl.write())
+    {
+      printf("Pipe Cannot send to server\n");
+      exit(0);
+    }
+
+    pipefl.read();
+    pipefl.decode();
+    m_pcSliceEncoder->resetQP(pcPic, (int)pipefl.action[0], pipefl.action[1]);
+#endif
+#endif
     if( encPic )
     // now compress (trial encode) the various slice segments (slices, and dependent slices)
     {

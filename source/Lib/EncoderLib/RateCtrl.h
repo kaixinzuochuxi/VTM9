@@ -73,8 +73,11 @@ const double g_RCBetaMaxValue  = -0.1;
 
 #define ALPHA     6.7542;
 #define BETA1     1.2517
+#if debugRCAI
+#define BETA2     -1.7860
+#else
 #define BETA2     1.7860
-
+#endif
 struct TRCLCU
 {
   int m_actualBits;

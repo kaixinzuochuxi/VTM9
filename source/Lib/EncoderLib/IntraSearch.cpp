@@ -1199,16 +1199,16 @@ bool IntraSearch::estIntraPredLumaQT(CodingUnit &cu, Partitioner &partitioner, c
       }
     }
 #if build_cu_tree
-    if (csBest->m_isTuEnc) {
-      pu.intradist = csBest->dist;
-      pu.intrabits = csBest->fracBits;
-      //#if meansatd
-      //      cu.satdrec = csBest->cus[0]->satdrec;
-      //      cu.satdori = csBest->cus[0]->satdori;
-      //#endif
-          //  //pu.cost = csBest->cost;
-          //  //pu.interdist = csBest->pus[0]->interdist;
-    }
+    //if (csBest->m_isTuEnc) {
+    //  pu.intradist = csBest->dist;
+    //  pu.intrabits = csBest->fracBits;
+    //  //#if meansatd
+    //  //      cu.satdrec = csBest->cus[0]->satdrec;
+    //  //      cu.satdori = csBest->cus[0]->satdori;
+    //  //#endif
+    //      //  //pu.cost = csBest->cost;
+    //      //  //pu.interdist = csBest->pus[0]->interdist;
+    //}
 #endif
     csBest->releaseIntermediateData();
     if( validReturn )

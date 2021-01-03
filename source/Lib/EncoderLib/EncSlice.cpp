@@ -1435,6 +1435,12 @@ void EncSlice::compressSlice( Picture* pcPic, const bool bCompressEntireSlice, c
   m_pcInterSearch->resetAffineMVList();
   m_pcInterSearch->resetUniMvList();
   ::memset(g_isReusedUniMVsFilled, 0, sizeof(g_isReusedUniMVsFilled));
+#if printqplambda
+  double l[3];
+  m_pcTrQuant->getLambdas(l);
+  printf("QP:%d\tslice_lambda:%.2f\tRDCost_lambda:%.2f\tQuant_lambda:%.2f\n",
+    pcSlice->getSliceQp(), pcSlice->getLambdas()[0],m_pcRdCost->getLambda(),l[0]);
+#endif
   encodeCtus( pcPic, bCompressEntireSlice, bFastDeltaQP, m_pcLib );
   if (checkPLTRatio) m_pcLib->checkPltStats( pcPic );
 }

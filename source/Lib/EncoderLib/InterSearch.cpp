@@ -7284,7 +7284,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     cs.addEmptyTUs( partitioner );
     Distortion distortion = 0;
 #if build_cu_tree
-    Distortion dist = 0;
+    //Distortion dist = 0;
 #endif // build_cu_tree
     for (int comp = 0; comp < numValidComponents; comp++)
     {
@@ -7309,25 +7309,25 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
           tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
           distortion += m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
 #if build_cu_tree
-          dist = m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), COMPONENT_Y, DF_SSE, &orgLuma);
-#if meansatd
-          CPelBuf pred = cs.getPredBuf(compID);
-          cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), COMPONENT_Y, DF_HAD, &orgLuma);
-#endif
+//          dist = m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), COMPONENT_Y, DF_SSE, &orgLuma);
+//#if meansatd
+//          CPelBuf pred = cs.getPredBuf(compID);
+//          cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), COMPONENT_Y, DF_HAD, &orgLuma);
+//#endif
 #endif // build_cu_tree
         }
         else
         {
           distortion += m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
 #if build_cu_tree
-          if (compID == COMPONENT_Y)
-          {
-            dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE, &orgLuma);
-#if meansatd
-            CPelBuf pred = cs.getPredBuf(compID);
-            cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD, &orgLuma);
-#endif
-          }
+//          if (compID == COMPONENT_Y)
+//          {
+//            dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE, &orgLuma);
+//#if meansatd
+//            CPelBuf pred = cs.getPredBuf(compID);
+//            cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD, &orgLuma);
+//#endif
+//          }
 #endif // build_cu_tree
         }
       }
@@ -7336,14 +7336,14 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
       {
         distortion += m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE);
 #if build_cu_tree
-        if (compID == COMPONENT_Y)
-        {
-          dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE);
-#if meansatd
-          CPelBuf pred = cs.getPredBuf(compID);
-          cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD);
-#endif
-        }
+//        if (compID == COMPONENT_Y)
+//        {
+//          dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE);
+//#if meansatd
+//          CPelBuf pred = cs.getPredBuf(compID);
+//          cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD);
+//#endif
+//        }
 #endif // build_cu_tree
       }
     }
@@ -7359,10 +7359,10 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     cs.fracBits = m_CABACEstimator->getEstFracBits();
     cs.cost     = m_pcRdCost->calcRdCost(cs.fracBits, cs.dist);
 #if build_cu_tree
-    pu.interdist = distortion;
-    pu.D_currecwoilf_curori_refrec = dist;
-    // pu.cost = cs.cost;
-    pu.interbits = cs.fracBits;
+    //pu.interdist = distortion;
+    //pu.D_currecwoilf_curori_refrec = dist;
+    //// pu.cost = cs.cost;
+    //pu.interbits = cs.fracBits;
 
 #endif
     return;
@@ -7656,7 +7656,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
   // update with clipped distortion and cost (previously unclipped reconstruction values were used)
   Distortion finalDistortion = 0;
 #if build_cu_tree
-  Distortion dist = 0;
+  //Distortion dist = 0;
 #endif
   for (int comp = 0; comp < numValidComponents; comp++)
   {
@@ -7737,7 +7737,7 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
 #endif
 
 #if build_cu_tree
-    CPelBuf pred = cs.getPredBuf(compID);
+    //CPelBuf pred = cs.getPredBuf(compID);
 #endif
 #if WCG_EXT
     if (m_pcEncCfg->getLumaLevelToDeltaQPMapping().isEnabled() || (
@@ -7753,27 +7753,27 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
         tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
         finalDistortion += m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
 #if build_cu_tree
-        tmpRecLuma.copyFrom(reco);
-        tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
-        dist = m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE, &orgLuma);
-#if meansatd
-        CPelBuf pred = cs.getPredBuf(compID);
-        cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD, &orgLuma);
-#endif
+//        tmpRecLuma.copyFrom(reco);
+//        tmpRecLuma.rspSignal(m_pcReshape->getInvLUT());
+//        dist = m_pcRdCost->getDistPart(org, tmpRecLuma, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE, &orgLuma);
+//#if meansatd
+//        CPelBuf pred = cs.getPredBuf(compID);
+//        cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD, &orgLuma);
+//#endif
 #endif
       }
       else
       {
         finalDistortion += m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE_WTD, &orgLuma);
 #if build_cu_tree
-        if (compID == COMPONENT_Y)
-        {
-          dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE, &orgLuma);
-#if meansatd
-          CPelBuf pred = cs.getPredBuf(compID);
-          cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD, &orgLuma);
-#endif
-        }
+//        if (compID == COMPONENT_Y)
+//        {
+//          dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE, &orgLuma);
+//#if meansatd
+//          CPelBuf pred = cs.getPredBuf(compID);
+//          cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD, &orgLuma);
+//#endif
+//        }
 #endif
       }
     }
@@ -7782,14 +7782,14 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     {
       finalDistortion += m_pcRdCost->getDistPart( org, reco, sps.getBitDepth( toChannelType( compID ) ), compID, DF_SSE );
 #if build_cu_tree
-      if (compID == COMPONENT_Y)
-      {
-        dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE);
-#if meansatd
-        CPelBuf pred = cs.getPredBuf(compID);
-        cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD);
-#endif
-      }
+//      if (compID == COMPONENT_Y)
+//      {
+//        dist = m_pcRdCost->getDistPart(org, reco, sps.getBitDepth(toChannelType(compID)), compID, DF_SSE);
+//#if meansatd
+//        CPelBuf pred = cs.getPredBuf(compID);
+//        cu.satdrec = m_pcRdCost->getDistPart(org, pred, sps.getBitDepth(toChannelType(compID)), compID, DF_HAD);
+//#endif
+//      }
 #endif
     }
   }
@@ -7813,14 +7813,14 @@ void InterSearch::encodeResAndCalcRdInterCU(CodingStructure &cs, Partitioner &pa
     }
   }
 #if build_cu_tree
-  cu.firstPU->interdist = finalDistortion;
-  cu.firstPU->interbits = finalFracBits;
-  cu.firstPU->D_currecwoilf_curori_refrec = dist;
-  //#if predfromori
-  //  cu.firstPU->interdistori = finalDistortionori;
-  //  cu.firstPU->interbitsori = finalFracBitsori;
-  //#endif
-    //cu.firstPU->cost = cs.cost;
+  //cu.firstPU->interdist = finalDistortion;
+  //cu.firstPU->interbits = finalFracBits;
+  //cu.firstPU->D_currecwoilf_curori_refrec = dist;
+  ////#if predfromori
+  ////  cu.firstPU->interdistori = finalDistortionori;
+  ////  cu.firstPU->interbitsori = finalFracBitsori;
+  ////#endif
+  //  //cu.firstPU->cost = cs.cost;
 #endif
   CHECK(cs.tus.size() == 0, "No TUs present");
 }

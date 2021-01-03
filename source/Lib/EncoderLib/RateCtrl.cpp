@@ -1417,6 +1417,9 @@ int EncRCPic::getRefineBitsForIntra( int orgBits )
 
 double EncRCPic::calculateLambdaIntra(double alpha, double beta, double MADPerPixel, double bitsPerPixel)
 {
+#if debugRCAI
+  beta = -beta;
+#endif
   return ( (alpha/256.0) * pow( MADPerPixel/bitsPerPixel, beta ) );
 }
 
@@ -5156,9 +5159,11 @@ int  RateCtrl::updateCpbState(int actualBits)
 void RateCtrl::initHrdParam(const GeneralHrdParams* generalHrd, const OlsHrdParams* olsHrd, int iFrameRate, double fInitialCpbFullness)
 {
   m_CpbSaturationEnabled = true;
+#if !debugbuffer
   m_cpbSize = (olsHrd->getCpbSizeValueMinus1(0, 0) + 1) << (4 + generalHrd->getCpbSizeScale());
   m_cpbState = (uint32_t)(m_cpbSize*fInitialCpbFullness);
   m_bufferingRate = (uint32_t)(((olsHrd->getBitRateValueMinus1(0, 0) + 1) << (6 + generalHrd->getBitRateScale())) / iFrameRate);
+#endif
   msg(NOTICE, "\nHRD - [Initial CPB state %6d] [CPB Size %6d] [Buffering Rate %6d]\n", m_cpbState, m_cpbSize, m_bufferingRate);
 }
 #endif

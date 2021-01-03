@@ -44,6 +44,9 @@
 #include "EncApp.h"
 #include "Utilities/program_options_lite.h"
 
+#if UsePipe
+//#include "EncoderLib/EncCu.h"
+#endif
 //! \ingroup EncoderApp
 //! \{
 
@@ -114,6 +117,20 @@ int main(int argc, char* argv[])
 #endif
   fprintf( stdout, "\n" );
 
+  /////
+#if UsePipe && Pframelevel
+  
+#if iswindows
+  extern usingpipe pipefl;
+  pipefl.init("\\\\.\\Pipe\\mypipe");
+  if (!pipefl.create_handle())
+  {
+    printf("Pipe cannot connect to server");
+    return 0;
+  }
+#endif
+#endif
+  /////
   std::fstream bitstream;
   EncLibCommon encLibCommon;
 
