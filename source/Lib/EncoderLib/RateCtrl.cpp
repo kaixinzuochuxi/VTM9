@@ -1909,6 +1909,12 @@ void RateCtrl::init(int totalFrames, int targetBitrate, int frameRate, int GOPSi
   m_bufferingRate        = (int)(targetBitrate / frameRate);
 #endif
 
+#if encBuffer
+  m_encBufState = 0;
+  m_tarBr = (int)(targetBitrate / frameRate);
+  m_framesInBuf.resize(0);
+
+#endif
   delete[] bitsRatio;
   delete[] GOPID2Level;
 }
@@ -1960,6 +1966,29 @@ void RateCtrl::destroyRCGOP()
   delete m_encRCGOP;
   m_encRCGOP = NULL;
 }
+#if encBuffer
+void RateCtrl::updateEncBuf(int actualBits)
+{
+  m_framesInBuf.push_back(actualBits);
+  m_encBufState = m_encBufState + actualBits - m_tarBr;
+  int throughput = m_tarBr;
+  while (m_framesInBuf.size()!=0 && m_framesInBuf[0] <= throughput)
+  {
+    throughput -= m_framesInBuf[0];
+    m_framesInBuf.erase(m_framesInBuf.begin());
+  }
+  
+  if (m_framesInBuf.size() == 0)
+  {
+    return;
+  }
+  else
+  {
+    m_framesInBuf[0] -= throughput;
+  }
+}
+
+#endif
 #elif modifiedRC
 //sequence level
 EncRCSeq::EncRCSeq()

@@ -1130,6 +1130,11 @@ public:
 
 #if UsePipe
 #if iswindows
+const double paraC = 4.164 * 16;
+const double paraK = 0.429;
+const int SlideWindowSize = 20;
+const double r_beta = 5;
+const double C0 = 1;
 class usingpipe
 {
 public:
@@ -1139,6 +1144,17 @@ public:
   HANDLE h_Pipe;
   vector<double> action = { 0,0 }; // 0, QP, 1, lambda
   vector<double> state_and_reward = { 0,0 };
+  double reward = 0;
+
+  double lastLambda=0;
+  double lastbpp=0;
+  double lastpsnr=0;
+  double ExpFrameBufLevel = 0;
+  double ExpGOPBufLevel = 0;
+  double sumbits=0;
+  double lastmse = 0;
+  double refmse = 0;
+  double GOPid=0;
   usingpipe() {};
 
   void init(string pipdir) { pip_name.empty(); pip_name += pipdir; };
@@ -1162,8 +1178,9 @@ public:
   void encode()
   {
     std::stringstream buf;
-    buf.precision(2);//覆盖默认精度
-    buf.setf(std::ios::fixed);//保留小数位
+    buf.precision(4);//覆盖默认精度
+    //buf.setf(std::ios::fixed);//保留小数位
+    buf.setf(std::ios::scientific);
     for (int i = 0; i < state_and_reward.size(); i++)
     {
       buf << state_and_reward[i] << " ";

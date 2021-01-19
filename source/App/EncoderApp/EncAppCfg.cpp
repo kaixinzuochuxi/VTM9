@@ -1201,7 +1201,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ("ChromaSampleLocType",                             m_chromaSampleLocType,                                0, "Specifies the location of chroma samples for progressive content")
   ("OverscanInfoPresent",                             m_overscanInfoPresentFlag,                        false, "Indicates whether conformant decoded pictures are suitable for display using overscan\n")
   ("OverscanAppropriate",                             m_overscanAppropriateFlag,                        false, "Indicates whether conformant decoded pictures are suitable for display using overscan\n")
-  ("VideoFullRange",                                  m_videoFullRangeFlag,                             false, "Indicates the black level and range of luma and chroma signals");
+  ("VideoFullRange",                                  m_videoFullRangeFlag,                             false, "Indicates the black level and range of luma and chroma signals")
+#if UsePipe
+  //("VideoFullRange", m_videoFullRangeFlag, false, "Indicates the black level and range of luma and chroma signals")
+  ("Pipename", m_pipename, string(""), "Target Pipe name\n")
+#endif
+    ;
   opts.addOptions()
   ("SEIBufferingPeriod",                              m_bufferingPeriodSEIEnabled,                      false, "Control generation of buffering period SEI messages")
   ("SEIPictureTiming",                                m_pictureTimingSEIEnabled,                        false, "Control generation of picture timing SEI messages")
@@ -1378,7 +1383,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   ( "UpscaledOutput",                                 m_upscaledOutput,                             0, "Output upscaled (2), decoded but in full resolution buffer (1) or decoded cropped (0, default) picture for RPR" )
   ( "MaxLayers",                                      m_maxLayers,                                  1, "Max number of layers" )
   ( "TargetOutputLayerSet,p",                         m_targetOlsIdx,                              -1, "Target output layer set index" )
-  ;
+    ;
   opts.addOptions()
   ( "MaxSublayers",                                   m_maxSublayers,                               1, "Max number of Sublayers")
   ( "AllLayersSameNumSublayersFlag",                  m_allLayersSameNumSublayersFlag,           true, "All layers same num sublayersflag")

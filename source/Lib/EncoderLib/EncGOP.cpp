@@ -2933,17 +2933,21 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     }
 #if UsePipe && Pframelevel
 #if iswindows
-    extern usingpipe pipefl;
-    pipefl.encode();
-    if (!pipefl.write())
-    {
-      printf("Pipe Cannot send to server\n");
-      exit(0);
-    }
+    
+      extern usingpipe pipefl;
+      pipefl.GOPid = iGOPid;
+      //if (pcSlice->getPic()->getPOC() == 0)
+      {
+        write_state_and_reward(0);
+      }
+      //if (pcSlice->getPic()->getPOC() > getGOPSize())
+      //if (pcSlice->getPic()->getPOC() > 0)
+      {
 
-    pipefl.read();
-    pipefl.decode();
-    m_pcSliceEncoder->resetQP(pcPic, (int)pipefl.action[0], pipefl.action[1]);
+        pipefl.read();
+        pipefl.decode();
+        m_pcSliceEncoder->resetQP(pcPic, (int)pipefl.action[0], pipefl.action[1]);
+      }
 #endif
 #endif
     if( encPic )
@@ -3612,6 +3616,80 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         {
           m_pcRateCtrl->getRCGOP()->updateAfterPicture( estimatedBits );
         }
+#if encBuffer
+        m_pcRateCtrl->updateEncBuf(actualTotalBits);
+#endif
+#if UsePipe
+#if iswindows
+        extern usingpipe pipefl;
+        pipefl.lastLambda = pcSlice->getLambdas()[0];
+        pipefl.lastbpp = double(actualTotalBits) / m_pcRateCtrl->getRCSeq()->getPicWidth() / m_pcRateCtrl->getRCSeq()->getPicHeight();
+
+#if REWARD==0
+        int leftFrames = min(SlideWindowSize, m_pcRateCtrl->getRCSeq()->getFramesLeft());
+        double curBufLevel = double(m_pcRateCtrl->m_encBufState) / m_pcRateCtrl->getRCSeq()->getTargetRate();
+        double a = double(leftFrames - 1) / leftFrames;
+        int fr = m_pcRateCtrl->getRCSeq()->getFrameRate();
+        double tarbpp = double(m_pcRateCtrl->getRCSeq()->getAverageBits()) / m_pcRateCtrl->getRCSeq()->getPicWidth() / m_pcRateCtrl->getRCSeq()->getPicHeight();
+        double dBf = abs(pipefl.ExpFrameBufLevel - curBufLevel);
+        double tmp = 1 + (dBf - (1 - a)*curBufLevel)*fr;
+        if (tmp < 0)
+        {
+          pipefl.reward = -MAX_INT;
+          pipefl.ExpFrameBufLevel = curBufLevel * a;
+          if (pcSlice->getPic()->getPOC() % getGOPSize() == 0)
+          {
+            pipefl.ExpGOPBufLevel = curBufLevel * double(leftFrames - getGOPSize()) / leftFrames;
+
+          }
+        }
+        else
+        {
+
+          double wf = paraC * paraK*fr*pow(tmp, -paraK - 1)*pow(tarbpp, -paraK);
+        
+
+          pipefl.reward = -C0 * PSNR_Y - wf * dBf;
+          
+          if (pcSlice->getPic()->getPOC() % getGOPSize() == 0)
+          {
+
+            double dBg = abs(pipefl.ExpGOPBufLevel - curBufLevel);
+            double tmpg = 1 + (dBg - (1 - a)*curBufLevel)*fr;
+            if (tmpg < 0)
+            {
+              pipefl.reward = -MAX_INT;
+              pipefl.ExpGOPBufLevel = curBufLevel * double(leftFrames - getGOPSize()) / leftFrames;
+            }
+            else
+            {
+            
+              double wg = paraC * paraK*fr*pow(tmpg, -paraK - 1)*pow(tarbpp, -paraK);
+              pipefl.reward -= r_beta * wg*dBg;
+            }
+            pipefl.ExpGOPBufLevel = curBufLevel * double(leftFrames - getGOPSize()) / leftFrames;
+            
+          }
+          pipefl.ExpFrameBufLevel = curBufLevel * a;
+     
+        }
+        printf("\n%.2f\n", pipefl.reward);
+#elif REWARD==1
+        pipefl.sumbits += actualTotalBits;
+        double a = 100 / pipefl.lastmse;
+        double b = 10000 / (pow(pipefl.lastmse - pipefl.refmse, 2) + 0.1);
+        double c = 10000000000 / (pow(pipefl.sumbits - double(m_pcRateCtrl->getRCSeq()->getAverageBits())*(pcSlice->getPic()->getPOC() + 1), 2)+0.1);
+        pipefl.reward = a * b*c;
+#endif
+#endif
+        
+        if (pcSlice->getPic()->getPOC() + 1 == m_pcRateCtrl->getRCSeq()->getTotalFrames())
+        {
+          write_state_and_reward(1);
+        }
+#endif
+        
+
   #if U0132_TARGET_BITS_SATURATION
         if (m_pcRateCtrl->getCpbSaturationEnabled())
         {
@@ -4376,7 +4454,15 @@ void EncGOP::xCalculateAddPSNR(Picture* pcPic, PelUnitBuf cPicD, const AccessUni
       upscaledPSNR[comp] = upscaledSSD ? 10.0 * log10( (double)maxval * maxval * upscaledWidth * upscaledHeight / (double)upscaledSSD ) : 999.99;
     }
   }
-
+#if UsePipe
+#if iswindows
+  extern usingpipe pipefl;
+  pipefl.lastpsnr = dPSNR[0];
+  pipefl.refmse = pipefl.lastmse;
+  pipefl.lastmse = MSEyuvframe[0];
+  
+#endif
+#endif
 #if EXTENSION_360_VIDEO
   m_ext360.calculatePSNRs(pcPic);
 #endif
@@ -5769,4 +5855,52 @@ void EncGOP::xCreateExplicitReferencePictureSetFromReference( Slice* slice, PicL
   slice->setRPL1idx( -1 );
   slice->setRPL1( pLocalRPL1 );
 }
+
+
+#if UsePipe
+void EncGOP::write_state_and_reward(int done)
+{
+
+#if iswindows
+
+  extern usingpipe pipefl;
+
+#if STATE==0
+  pipefl.state_and_reward.resize(9);
+
+  pipefl.state_and_reward[0] = double(m_pcRateCtrl->getRCSeq()->getAverageBits()) / m_pcRateCtrl->getRCSeq()->getPicWidth() / m_pcRateCtrl->getRCSeq()->getPicHeight();
+  pipefl.state_and_reward[1] = pipefl.lastLambda;
+  pipefl.state_and_reward[2] = pipefl.lastbpp;
+  pipefl.state_and_reward[3] = pipefl.lastpsnr;
+
+  pipefl.state_and_reward[4] = double(m_pcRateCtrl->m_framesInBuf.size());
+  pipefl.state_and_reward[5] = double(m_pcRateCtrl->m_encBufState) / m_pcRateCtrl->getRCSeq()->getTargetRate();
+  pipefl.state_and_reward[6] = pipefl.GOPid;
+
+
+  pipefl.state_and_reward[7] = pipefl.reward;
+  // done
+  pipefl.state_and_reward[8] = done;
+  for (int j = 0; j < 9; j++)
+    printf("%.2f ", pipefl.state_and_reward[j]);
+  printf("\n");
+#elif STATE==1
+
+#endif
+  //if (pcSlice->getPic()->getPOC() > getGOPSize())
+  //if (pcSlice->getPic()->getPOC() > 0)
+  {
+    pipefl.encode();
+    if (!pipefl.write())
+    {
+      printf("Pipe Cannot send to server\n");
+      exit(0);
+    }
+
+    
+  }
+#endif
+
+}
+#endif
 //! \}

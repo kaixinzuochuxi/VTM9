@@ -784,6 +784,9 @@ public:
   void  destroy   ();                                         ///< destroy option handling class
   bool  parseCfg  ( int argc, char* argv[] );                ///< parse configuration file to fill member variables
 
+#if UsePipe
+  std::string m_pipename;
+#endif
 };// END CLASS DEFINITION EncAppCfg
 
 //! \}

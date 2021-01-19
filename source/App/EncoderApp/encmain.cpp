@@ -117,20 +117,7 @@ int main(int argc, char* argv[])
 #endif
   fprintf( stdout, "\n" );
 
-  /////
-#if UsePipe && Pframelevel
-  
-#if iswindows
-  extern usingpipe pipefl;
-  pipefl.init("\\\\.\\Pipe\\mypipe");
-  if (!pipefl.create_handle())
-  {
-    printf("Pipe cannot connect to server");
-    return 0;
-  }
-#endif
-#endif
-  /////
+
   std::fstream bitstream;
   EncLibCommon encLibCommon;
 
@@ -227,7 +214,22 @@ int main(int argc, char* argv[])
   std::time_t startTime2 = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   fprintf(stdout, " started @ %s", std::ctime(&startTime2) );
   clock_t startClock = clock();
+  /////
+#if UsePipe && Pframelevel
 
+#if iswindows
+  extern usingpipe pipefl;
+  pipefl.init(string("\\\\.\\Pipe\\")+(*((EncAppCfg*)pcEncApp[0])).m_pipename);
+  //(*((EncAppCfg*)pcEncApp[0])).m_pipename
+  //"\\\\.\\Pipe\\mypipe"
+  if (!pipefl.create_handle())
+  {
+    printf("Pipe cannot connect to server");
+    return 0;
+  }
+#endif
+#endif
+  /////
   // call encoding function per layer
   bool eos = false;
 

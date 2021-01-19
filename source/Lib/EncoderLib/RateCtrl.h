@@ -373,6 +373,14 @@ private:
   uint32_t       m_cpbSize;                 // CPB size
   uint32_t       m_bufferingRate;           // Buffering rate
 #endif
+
+#if encBuffer
+public:
+  uint32_t m_encBufState;
+  uint32_t m_tarBr;
+  vector<uint32_t> m_framesInBuf;
+  void updateEncBuf(int actualBits);
+#endif
 };
 
 

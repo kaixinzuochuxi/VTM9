@@ -130,7 +130,7 @@ enum CTUtypes
 #endif
 #endif
 #define printqplambda 1
-#define UsePipe 0
+#define UsePipe 1
 #if UsePipe
 #define Pframelevel 1
 #define Pctulevel 1
@@ -148,7 +148,14 @@ enum CTUtypes
 #define PBUFSIZE 256
 #endif
 #endif
+//////// reward and state
+#if UsePipe
+#define REWARD 1
+#define STATE 0
+#endif
 
+///// 
+#define encBuffer 1 // buffersize=BR, 
 
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_R0058                                        1 // JVET-R0058: the combination of RPR, subpictures, and scalability 

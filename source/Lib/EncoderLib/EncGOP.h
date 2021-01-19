@@ -332,6 +332,11 @@ protected:
   void applyDeblockingFilterParameterSelection( Picture* pcPic, const uint32_t numSlices, const int gopID );
 #endif
   void xCreateExplicitReferencePictureSetFromReference( Slice* slice, PicList& rcListPic, const ReferencePictureList *rpl0, const ReferencePictureList *rpl1 );
+
+#if UsePipe
+  void EncGOP::write_state_and_reward(int done);
+#endif
+
 };// END CLASS DEFINITION EncGOP
 
 //! \}
