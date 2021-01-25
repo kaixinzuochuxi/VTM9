@@ -1588,6 +1588,12 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
 
   m_framesToBeEncoded = ( m_framesToBeEncoded + m_temporalSubsampleRatio - 1 ) / m_temporalSubsampleRatio;
   m_adIntraLambdaModifier = cfg_adIntraLambdaModifier.values;
+#if getseqname
+  extern string curr_seq_name;
+  curr_seq_name = m_inputFileName;
+  extern int conf_QP;
+  conf_QP = m_iQP;
+#endif
   if(m_isField)
   {
     //Frame height
@@ -2283,6 +2289,7 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
   }
 
 #if ENABLE_QPA_SUB_CTU
+#if !disable_RA_cusize_limit
  #if QP_SWITCHING_FOR_PARALLEL
   if ((m_iQP < 38) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && (m_iSourceWidth <= 2048) && (m_iSourceHeight <= 1280)
  #else
@@ -2292,15 +2299,22 @@ bool EncAppCfg::parseCfg( int argc, char* argv[] )
       && (!m_wcgChromaQpControl.enabled)
  #endif
       && ((1 << (m_log2MaxTbSize + 1)) == m_uiCTUSize) && (m_iSourceWidth > 512 || m_iSourceHeight > 320))
+#else
+  if(false)
+#endif
   {
     m_cuQpDeltaSubdiv = 2;
   }
 #else
+#if !disable_RA_cusize_limit
  #if QP_SWITCHING_FOR_PARALLEL
   if( ( m_iQP < 38 ) && ( m_iGOPSize > 4 ) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && ( m_iSourceHeight <= 1280 ) && ( m_iSourceWidth <= 2048 ) )
  #else
   if( ( ( int ) m_fQP < 38 ) && ( m_iGOPSize > 4 ) && m_bUsePerceptQPA && !m_bUseAdaptiveQP && ( m_iSourceHeight <= 1280 ) && ( m_iSourceWidth <= 2048 ) )
  #endif
+#else
+  if(false)
+#endif
   {
     msg( WARNING, "*************************************************************************\n" );
     msg( WARNING, "* WARNING: QPA on with large CTU for <=HD sequences, limiting CTU size! *\n" );

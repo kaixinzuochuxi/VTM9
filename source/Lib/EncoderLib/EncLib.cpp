@@ -1527,8 +1527,19 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
 #if ENABLE_QPA
   if (getUsePerceptQPA() && !bUseDQP)
   {
-    CHECK( m_cuQpDeltaSubdiv != 0, "max. delta-QP subdiv must be zero!" );
+#if (framelevelQPA && !CTUlevelQPA) || alambda
+    ;
+#else
+    CHECK(m_cuQpDeltaSubdiv != 0, "max. delta-QP subdiv must be zero!");
+#if dqp_apply_to_low_resolution
+
+    bUseDQP = (getBaseQP() < 38);
+#else
     bUseDQP = (getBaseQP() < 38) && (getSourceWidth() > 512 || getSourceHeight() > 320);
+#endif
+    
+   
+#endif
   }
 #endif
 
@@ -1635,7 +1646,11 @@ void EncLib::xInitPPS(PPS &pps, const SPS &sps)
     }
   }
  #if ENABLE_QPA
+#if !disable_QPA_with_auto_chormaQPflag
   if ((getUsePerceptQPA() || getSliceChromaOffsetQpPeriodicity() > 0) && (getChromaFormatIdc() != CHROMA_400))
+#else
+  if ((getSliceChromaOffsetQpPeriodicity() > 0) && (getChromaFormatIdc() != CHROMA_400))
+#endif
   {
     bChromaDeltaQPEnabled = true;
   }

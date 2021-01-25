@@ -1,0 +1,50 @@
+
+VVCSoftware: VTM Encoder Version 9.0rc1 [Windows][VS 1900][64 bit] [SIMD=AVX2] 
+
+TOOL CFG: IBD:1 HAD:1 RDQ:1 RDQTS:1 RDpenalty:0 LQP:0 SQP:0 ASR:0 MinSearchWindow:8 RestrictMESampling:0 FEN:1 ECU:0 FDM:1 CFM:0 ESD:0 TransformSkip:1 TransformSkipFast:1 TransformSkipLog2MaxSize:5 ChromaTS:1 BDPCM:0 Tiles: 1x1 Slices: 1 MCTS:0 SAO:1 ALF:1 CCALF:1 WPP:0 WPB:0 PME:2  WaveFrontSynchro:0 WaveFrontSubstreams:1 ScalingList:0 TMVPMode:1  DQ:1  SignBitHidingFlag:0 RecalQP:0 
+TOOL CFG: LFNST:0 MMVD:1 Affine:1 AffineType:1 PROF:1 SubPuMvp:1+0 DualITree:1 IMV:1 BIO:0 LMChroma:1 HorCollocatedChroma:1 VerCollocatedChroma:0 MTS: 1(intra) 0(inter) SBT:1 ISP:1 SMVD:0 CompositeLTReference:0 Bcw:1 BcwFast:1 LADF:0 CIIP:1 Geo:1 AllowDisFracMMVD:1 AffineAmvr:0 AffineAmvrEncOpt:0 DMVR:0 MmvdDisNum:6 JointCbCr:1 ACT:0 PLT:0 IBC:0 HashME:0 WrapAround:0 VirtualBoundariesEnabledFlag:0 VirtualBoundariesPresentInSPSFlag:1 vertical virtual boundaries:[ ] horizontal virtual boundaries:[ ] Reshape:1 (Signal:SDR Opt:0 CSoffset:1) MRL:1 MIP:0 EncDbOpt:0 
+FAST TOOL CFG: LCTUFast:1 FastMrg:1 PBIntraFast:1 IMV4PelFast:1 MTSMaxCand: 3(intra) 4(inter) ISPFast:0 AMaxBT:1 E0023FastEnc:1 ContentBasedFastQtbt:0 UseNonLinearAlfLuma:1 UseNonLinearAlfChroma:1 MaxNumAlfAlternativesChroma:8 FastLocalDualTree:2 NumSplitThreads:1 NumWppThreads:1+0 EnsureWppBitEqual:0 RPR:0 TemporalFilter:0 
+
+
+ started @ Mon Jan 25 20:25:50 2021
+QP:36	slice_lambda:2473.55	RDCost_lambda:2473.55	Quant_lambda:2473.55
+POC    0 LId:  0 TId: 0 ( IDR_N_LP, I-SLICE, QP 36 )      23696 bits [Y 33.6801 dB    U 37.8336 dB    V 37.8154 dB] [Y MSE 445.8487  U MSE 171.3344  V MSE 172.0541] [ET     3 ] [L0] [L1]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC    1 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        704 bits [Y 32.5702 dB    U 37.7445 dB    V 37.2419 dB] [Y MSE 575.6784  U MSE 174.8845  V MSE 196.3419] [ET     1 ] [L0 0] [L1 0c]
+QP:44	slice_lambda:15706.06	RDCost_lambda:15706.06	Quant_lambda:15706.06
+POC    2 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 44 )        968 bits [Y 32.0912 dB    U 37.7826 dB    V 37.2402 dB] [Y MSE 642.8026  U MSE 173.3565  V MSE 196.4171] [ET     1 ] [L0 1 0] [L1 1c 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC    3 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        712 bits [Y 31.4012 dB    U 37.6804 dB    V 36.9951 dB] [Y MSE 753.4918  U MSE 177.4826  V MSE 207.8224] [ET     1 ] [L0 2 1 0] [L1 2c 1 0]
+QP:44	slice_lambda:15706.06	RDCost_lambda:15706.06	Quant_lambda:15706.06
+POC    4 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 44 )       1160 bits [Y 31.6648 dB    U 37.5749 dB    V 36.7803 dB] [Y MSE 709.1172  U MSE 181.8490  V MSE 218.3565] [ET     2 ] [L0 3 2 1 0] [L1 3c 2 1 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC    5 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        664 bits [Y 31.3737 dB    U 37.4641 dB    V 36.6837 dB] [Y MSE 758.2731  U MSE 186.5472  V MSE 223.2675] [ET     2 ] [L0 4 3 2 0] [L1 4c 3 2 0]
+QP:44	slice_lambda:15706.06	RDCost_lambda:15706.06	Quant_lambda:15706.06
+POC    6 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 44 )       1104 bits [Y 31.3843 dB    U 37.4792 dB    V 36.7434 dB] [Y MSE 756.4362  U MSE 185.8987  V MSE 220.2194] [ET     2 ] [L0 5 4 3 0] [L1 5c 4 3 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC    7 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        824 bits [Y 31.1398 dB    U 37.3221 dB    V 36.4812 dB] [Y MSE 800.2380  U MSE 192.7492  V MSE 233.9295] [ET     2 ] [L0 6 5 4 0] [L1 6c 5 4 0]
+QP:38	slice_lambda:3926.52	RDCost_lambda:3926.52	Quant_lambda:3926.52
+POC    8 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 38 )       5216 bits [Y 33.0583 dB    U 37.6918 dB    V 37.4199 dB] [Y MSE 514.4769  U MSE 177.0190  V MSE 188.4577] [ET     4 ] [L0 7 6 5 0] [L1 7c 6 5 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC    9 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        576 bits [Y 32.0566 dB    U 37.6184 dB    V 37.1995 dB] [Y MSE 647.9418  U MSE 180.0356  V MSE 198.2661] [ET     1 ] [L0 8 7 6 0] [L1 8c 7 6 0]
+QP:44	slice_lambda:15706.06	RDCost_lambda:15706.06	Quant_lambda:15706.06
+POC   10 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 44 )       1024 bits [Y 31.6962 dB    U 37.5366 dB    V 36.9912 dB] [Y MSE 704.0123  U MSE 183.4613  V MSE 208.0086] [ET     1 ] [L0 9 8 7 0] [L1 9c 8 7 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC   11 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        880 bits [Y 31.2794 dB    U 37.3797 dB    V 36.8636 dB] [Y MSE 774.9179  U MSE 190.2104  V MSE 214.2111] [ET     1 ] [L0 10 9 8 0] [L1 10c 9 8 0]
+QP:44	slice_lambda:15706.06	RDCost_lambda:15706.06	Quant_lambda:15706.06
+POC   12 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 44 )       1136 bits [Y 31.2205 dB    U 37.3416 dB    V 36.8073 dB] [Y MSE 785.5103  U MSE 191.8831  V MSE 217.0053] [ET     1 ] [L0 11 10 8 0] [L1 11c 10 8 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC   13 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        704 bits [Y 30.9365 dB    U 37.3338 dB    V 36.7278 dB] [Y MSE 838.5946  U MSE 192.2302  V MSE 221.0151] [ET     1 ] [L0 12 11 8 0] [L1 12c 11 8 0]
+QP:44	slice_lambda:15706.06	RDCost_lambda:15706.06	Quant_lambda:15706.06
+POC   14 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 44 )       1016 bits [Y 31.0808 dB    U 37.5009 dB    V 36.6551 dB] [Y MSE 811.1926  U MSE 184.9751  V MSE 224.7430] [ET     1 ] [L0 13 12 8 0] [L1 13c 12 8 0]
+QP:45	slice_lambda:19788.40	RDCost_lambda:19788.40	Quant_lambda:19788.40
+POC   15 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 45 )        600 bits [Y 30.8752 dB    U 37.4768 dB    V 36.1932 dB] [Y MSE 850.5130  U MSE 186.0020  V MSE 249.9648] [ET     1 ] [L0 14 13 8 0] [L1 14c 13 8 0]
+QP:38	slice_lambda:3926.52	RDCost_lambda:3926.52	Quant_lambda:3926.52
+POC   16 LId:  0 TId: 0 ( TRAIL, B-SLICE, QP 38 )       5528 bits [Y 32.8988 dB    U 37.8565 dB    V 37.3737 dB] [Y MSE 533.7274  U MSE 170.4326  V MSE 190.4709] [ET     5 ] [L0 15 14 8 0] [L1 15c 14 8 0]
+
+LayerId  0
+	Total Frames |   Bitrate     Y-PSNR    U-PSNR    V-PSNR    YUV-PSNR   
+	       17    a     136.8000   31.7887   37.5657   36.9537   32.9106
+
+ finished @ Mon Jan 25 20:26:29 2021
+ Total Time:       39.434 sec. [user]       39.437 sec. [elapsed]

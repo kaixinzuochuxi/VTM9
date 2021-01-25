@@ -1740,6 +1740,8 @@ void EncApp::pre_analyze()
       pa.frameh = m_iSourceHeight;
       pa.framew = m_iSourceWidth;
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
+      pa.m_size = num_pre_ana;
+      pa.cfgctusize = m_uiCTUSize;
       pa.init();
     }
     

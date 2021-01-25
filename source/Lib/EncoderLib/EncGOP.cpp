@@ -2938,12 +2938,12 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       pipefl.GOPid = iGOPid;
       //if (pcSlice->getPic()->getPOC() == 0)
       {
-        write_state_and_reward(0);
+        
       }
       //if (pcSlice->getPic()->getPOC() > getGOPSize())
-      //if (pcSlice->getPic()->getPOC() > 0)
+      if (pcSlice->getPic()->getPOC() > 0)
       {
-
+        write_state_and_reward(0);
         pipefl.read();
         pipefl.decode();
         m_pcSliceEncoder->resetQP(pcPic, (int)pipefl.action[0], pipefl.action[1]);

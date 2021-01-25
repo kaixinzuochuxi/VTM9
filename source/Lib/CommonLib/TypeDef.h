@@ -54,7 +54,7 @@
 #define pre_ana 0
 
 #define debugRCAI 1
-
+#define getseqname 1
 // RC
 #define RlambdaRC 1
 #if RlambdaRC==0
@@ -62,7 +62,7 @@
 #endif
 
 #define printRCvar 0
-
+#define printqplambda 1
 
 
 #if modifiedRC
@@ -129,15 +129,15 @@ enum CTUtypes
 #endif
 #endif
 #endif
-#define printqplambda 1
-#define UsePipe 1
+
+#define iswindows 1 //0, linux,1,windows
+
+#define UsePipe 0
 #if UsePipe
 #define Pframelevel 1
 #define Pctulevel 1
 
-#endif
-#define iswindows 1 //0, linux,1,windows
-#if UsePipe
+
 #define NOMINMAX
 //#define NOERROR
 #if iswindows
@@ -147,15 +147,58 @@ enum CTUtypes
 #endif
 #define PBUFSIZE 256
 #endif
-#endif
-//////// reward and state
-#if UsePipe
+
+
 #define REWARD 1
 #define STATE 0
 #endif
 
+
+
 ///// 
 #define encBuffer 1 // buffersize=BR, 
+
+#define QPAmethod 1
+#define QPAconfig 1
+
+#ifdef QPAmethod
+
+#define windows 0
+#define useoriaqp 0
+#define usecutreeaqp 1
+#define alambda 1
+#define mbtreeQPA 0
+
+
+
+#if usecutreeaqp
+
+#define CTUlevelQPA 0
+#define framelevelQPA 1
+#define changelambdafromQP 0
+#if framelevelQPA
+
+#endif
+
+#endif
+
+#if alambda 
+
+#define CTUlevelalambda 0
+#define framelevelalambda 1
+#define changeQPfromlambda 0
+#endif
+#endif // QPAmethod
+
+#ifdef QPAconfig
+#define is_dqp_not_actualqp 1 // 1 dqp, should add with baseqp; 0 acutal qp,should not add with base qp
+#define getseqname 1
+#define dqp_apply_to_low_resolution 1
+#define disable_RA_cusize_limit 1 // 0: default, limit cu size to 64; 1: donot limit
+#define disable_QPA_with_auto_chormaQPflag 1 //0: default, when open QPA chormaQPflagwill be opened; 1 QPA without chormaQPflagwill
+
+#endif
+
 
 //########### place macros to be removed in next cycle below this line ###############
 #define JVET_R0058                                        1 // JVET-R0058: the combination of RPR, subpictures, and scalability 
