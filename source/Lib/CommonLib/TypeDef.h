@@ -51,14 +51,19 @@
 #include <cassert>
 
 // self define macro
-#define pre_ana 0
-
+#define pre_ana 1
+#if pre_ana
+#define refinemu 3//0, not refine; 1, pow0.25, 2, pow0.5, 3, pow0.75, 4, 
+#endif
 #define debugRCAI 1
 #define getseqname 1
 // RC
 #define RlambdaRC 1
 #if RlambdaRC==0
 #define modifiedRC 1
+#elif RlambdaRC==1
+#define keepGOPlambdaratio 0 // store lambdaratio under RCGOP
+#define useCUTreeLambdaRatio 1 //
 #endif
 
 #define printRCvar 0
@@ -149,8 +154,8 @@ enum CTUtypes
 #endif
 
 
-#define REWARD 1
-#define STATE 0
+#define REWARD 3
+#define STATE 1
 #endif
 
 
@@ -164,9 +169,11 @@ enum CTUtypes
 #ifdef QPAmethod
 
 #define windows 0
-#define useoriaqp 0
-#define usecutreeaqp 1
-#define alambda 1
+#define useoriaqp 1
+// dqp
+#define usecutreeaqp 0
+// dlambda
+#define alambda 0
 #define mbtreeQPA 0
 
 

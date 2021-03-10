@@ -327,7 +327,7 @@ protected:
 #if pre_ana
 const int g_GOPSizeRA = 16;
 const int g_GOPSizeLD = 8;
-const int g_presizeLD = 80;
+const int g_presizeLD = 40;
 int getRPLIdxLDB(int poc);
 int getRPLIdxRA(int poc);
 
@@ -350,7 +350,9 @@ public:
   int swEndIdx;
   vector<PelBuf*> pre_ana_buf;
   vector<vector<vector<uint64_t>>> CUSATD;
+  vector<vector<vector<double>>> CUXI;
   vector<uint64_t> FrameSATD;
+  vector<double> FrameXI;
   int IBCRef[4][3][2];
   vector<int> encodingorder;
 
@@ -827,7 +829,54 @@ public:
     CUSATD.resize(cursize + m_size);
     for (int i = 0; i < m_size; i++)
       CUSATD[i + cursize].resize(TotalCTUNum);
+    
+    //FrameSATD.resize(cursize + m_size);
+
+    CUXI.resize(cursize + m_size);
+    for (int i = 0; i < m_size; i++)
+    {
+      CUXI[i + cursize].resize(TotalCTUNum);
+      //for (int j = 0; j < TotalCTUNum; j++)
+      //{
+      //  CUXI[i + cursize][j] = 1;
+      //}
+    }
   }
+
+  void resetCUSATD()
+  {
+    CUSATD.clear();
+    FrameSATD.clear();
+    auto cur_size = pre_ana_buf.size();
+    CUSATD.resize(cur_size);
+    for (int i = 0; i < cur_size; i++)
+    {
+      CUSATD[i].resize(TotalCTUNum);
+     
+    }
+    FrameSATD.resize(cur_size);
+  }
+  void resetCUXI()
+  {
+    CUXI.clear();
+    auto cur_size = pre_ana_buf.size();
+    CUXI.resize(cur_size);
+    for (int i = 0; i < cur_size; i++)
+    {
+      CUXI[i].resize(TotalCTUNum);
+      for (int j = 0; j < TotalCTUNum; j++)
+      {
+        CUXI[i][j].resize(4);
+        CUXI[i][j][0] = 1;
+        CUXI[i][j][1] = 1;
+        CUXI[i][j][2] = 1;
+        CUXI[i][j][3] = 1;
+      }
+    }
+    FrameXI.clear();
+    FrameXI.resize(cur_size);
+  }
+
 
   Position getCTUPos(int ctuidx)
   {
@@ -891,23 +940,35 @@ public:
 
   void updateFrameSATD(int startpos,int endpos)
   {
+    
     for(int idx=startpos;idx<endpos;idx++)
     {
+      int total_cu = 0;
       for (int i = 0; i < CUSATD[idx].size(); i++)
       {
         for (int j = 0; j < CUSATD[idx][i].size(); j++)
         {
-          FrameSATD[idx] += CUSATD[idx][i][j];
+          if (CUSATD[idx][i][j] != 0)
+          {
+            FrameSATD[idx] += CUSATD[idx][i][j];
+            //printf("%d\t%d\t%d\n",idx,i,j);
+            FrameXI[idx] += CUXI[idx][i][j];
+            //printf("%d\t%d\t%d\n", idx, i, j);
+            total_cu += 1;
+          }
         }
       }
-      
+      //printf("xxx\n");
+      FrameXI[idx] = FrameXI[idx] / total_cu;
     }
   }
 
   void clearSATD()
   {
     CUSATD.clear();
+    CUXI.clear();
     FrameSATD.clear();
+    FrameXI.clear();
 
   }
 
@@ -1016,7 +1077,7 @@ public:
     return d;
   }
 
-  vector<uint64_t>  CalInterSATD(int fidx,int ctuidx, RPLEntry rpl1, RPLEntry rpl2)
+  vector<uint64_t>  CalInterSATD(int fidx,int ctuidx, RPLEntry rpl1, RPLEntry rpl2, vector<uint64_t> dintra)
   {
     
 
@@ -1063,31 +1124,33 @@ public:
         else if (x == xctu + CTUsize && y == yctu + CTUsize)
           IBCIdx = 3;
         
+        int best_rl = 0;
+        int best_refidx = 0;
 
         // for L0
         for (int refidx = 0; refidx < numRefPics0; refidx++)
         {
           int refpoc = fidx - deltaRefPics0[refidx];
-          //if(refpoc>=0)
-          //{
-            dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun));
-          //}
-          //else
-          //{
-            //dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun));
-          //}
-            //if (IBCIdx == 0 && x == 0 && y == 0 && refidx==0)
-            //{
-            //  printf("%d->%d:  %llu\n", fidx, refpoc,dist);
-            //}
+          auto curdist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun);
+          if (curdist < dist)
+          {
+            dist = curdist;
+            best_rl = 0;
+            best_refidx = refidx;
+          }
+          
         }
         // for L1 if not LDP
         for (int refidx = 0; refidx < numRefPics1; refidx++)
         {
           int refpoc = fidx - deltaRefPics1[refidx];
-
-          dist = min(dist, m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun));
-
+          auto curdist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), pre_ana_buf[refpoc]->subBuf(x, y, w, h), 10, COMPONENT_Y, costfun);
+          if (curdist < dist)
+          {
+            dist = curdist;
+            best_rl = 1;
+            best_refidx = refidx;
+          }
         }
         // for combine if not LDP}
         if (numRefPics1 != 0 && numRefPics0 != 0)
@@ -1107,12 +1170,72 @@ public:
             t.n = 0; 
            
             tmp.addAvg(pre_ana_buf[refpoc0]->subBuf(x, y, w, h), pre_ana_buf[refpoc1]->subBuf(x, y, w, h),t);
+            auto curdist = m_pcRdCost->getDistPart(pre_ana_buf[fidx]->subBuf(x, y, w, h), tmp, 10, COMPONENT_Y, costfun);
+            if (curdist < dist)
+            {
+              dist = curdist;
+              best_rl = 2;
+              best_refidx = 0;
+            }
           }
+
         }
 
+        
 
 
         d[IBCIdx] = dist;
+        // cal xi
+        if (double(dist) < dintra[IBCIdx])
+        {
+          if (best_rl == 0)
+          {
+            int refpoc = fidx - deltaRefPics0[best_refidx];
+            double mu = 1 - double(dist) / dintra[IBCIdx];
+#if refinemu==0
+            mu = mu;
+#elif refinemu==1
+            mu = pow(mu, 0.25);
+#elif refinemu==2
+            mu = pow(mu, 0.5);
+#elif refinemu==3
+            mu = pow(mu, 0.75);
+#endif
+            CUXI[refpoc][ctuidx][IBCIdx] += mu * CUXI[fidx][ctuidx][IBCIdx];
+          }
+          else if (best_rl == 1)
+          {
+            int refpoc = fidx - deltaRefPics1[best_refidx];
+            double mu = 1 - double(dist) / dintra[IBCIdx];
+#if refinemu==0
+            mu = mu;
+#elif refinemu==1
+            mu = pow(mu, 0.25);
+#elif refinemu==2
+            mu = pow(mu, 0.5);
+#elif refinemu==3
+            mu = pow(mu, 0.75);
+#endif
+            CUXI[refpoc][ctuidx][IBCIdx] += mu * CUXI[fidx][ctuidx][IBCIdx];
+          }
+          else if (best_rl == 2)
+          {
+            int refpoc0 = fidx - deltaRefPics0[best_refidx];
+            int refpoc1 = fidx - deltaRefPics1[best_refidx];
+            double mu = 1 - double(dist) / dintra[IBCIdx];
+#if refinemu==0
+            mu = mu;
+#elif refinemu==1
+            mu = pow(mu, 0.25);
+#elif refinemu==2
+            mu = pow(mu, 0.5);
+#elif refinemu==3
+            mu = pow(mu, 0.75);
+#endif
+            CUXI[refpoc0][ctuidx][IBCIdx] += mu / 2 * CUXI[fidx][ctuidx][IBCIdx];
+            CUXI[refpoc1][ctuidx][IBCIdx] += mu / 2 * CUXI[fidx][ctuidx][IBCIdx];
+          }
+        }
       }
     }
 
@@ -1147,14 +1270,49 @@ public:
   double reward = 0;
 
   double lastLambda=0;
-  double lastbpp=0;
-  double lastpsnr=0;
+  
+  
+  
+  double sumbits=0;
+  
+  double refmse = 0;
+  
+
+  // R state
+  double seq_avg_bpp = 0;
+  double lastbpp = 0;
+  double gop_Rleft_ratio = 0;
+  double sw_avg_bpp = 0;
+  double gop_avg_bpp = 0;
+
+  // D
+  double lastpsnr = 0;
+  double lastmse = 0;
+
+  // buffer
+  double cur_buf_ratio = 0;
+  double frames_in_buf = 0;
   double ExpFrameBufLevel = 0;
   double ExpGOPBufLevel = 0;
-  double sumbits=0;
-  double lastmse = 0;
-  double refmse = 0;
-  double GOPid=0;
+
+  // hierarchical
+  double GOPid = 0;
+  double level = 0;
+  double xi = 0;
+  int gop_frame_left = 0;
+  // content
+  int GOP_frame_left = 0;
+  double c_avg_frame_sp;
+  double c_var_frame_sp;
+  vector<double> c_avg_ctu_sp;
+
+  double c_frame_satd;
+
+  // special condition
+  bool isoverflow = false;
+  bool isunderflow = true;
+
+
   usingpipe() {};
 
   void init(string pipdir) { pip_name.empty(); pip_name += pipdir; };

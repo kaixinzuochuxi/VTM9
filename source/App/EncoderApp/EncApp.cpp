@@ -1427,11 +1427,11 @@ void EncApp::genSATDRA(int start,int end)
     //printf("poc:%d\tIdx:%d\n", pa.encodingorder[eocidx], ridx);
 
     int curPOC = pa.encodingorder[eocidx];
-    if (curPOC != 0)
-    {
+    //if (curPOC != 0)
+    //{
 
-      auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[ridx], m_RPLList1[ridx]);
-    }
+    //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[ridx], m_RPLList1[ridx]);
+    //}
     for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
     {
 
@@ -1609,7 +1609,8 @@ void EncApp::pre_analyze()
       pa.m_pcRdCost = m_cEncLib.getCuEncoder()->getRDcost();
       num_pre_ana = min(m_cEncLib.getFramesToBeEncoded(), num_pre_ana);
       pa.m_size = num_pre_ana;
-      pa.cfgctusize = m_uiCTUSize;
+      //pa.cfgctusize = m_uiCTUSize;
+      pa.cfgctusize =32;
       pa.init();
       pa.swEndIdx = pa.curidx + num_pre_ana;
     }
@@ -1624,111 +1625,130 @@ void EncApp::pre_analyze()
     }
     startpos = m_cEncLib.m_iPOCLast + 1;
     endpos = startpos + num_pre_ana;
-
+    auto cur_size = pa.CUSATD.size();
     if (num_pre_ana != 0)
     {
       //pre_analysis pa = pre_analysis(m_iSourceWidth, m_iSourceHeight);
-      
-      
+
+
       for (int fidx = 0; fidx < num_pre_ana; fidx++)
       {
+        // read YUV
         if (m_cEncLib.m_iPOCLast + fidx + 2 > m_cEncLib.getFramesToBeEncoded() || m_cVideoIOYuvInputFile.isEof())
         {
           break;
         }
         m_cVideoIOYuvInputFile.read(*m_orgPic, *m_trueOrgPic, ipCSC, m_aiPad, m_InputChromaFormatIDC, m_bClipInputVideoToRec709Range);
 
-
-        if (pa.pre_ana_buf.size()< m_cEncLib.m_iPOCLast + 2 + fidx)
-        { 
+        // store YUV
+        if (pa.pre_ana_buf.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
+        {
           Pel * tbuf = new Pel[m_iSourceWidth*m_iSourceHeight];
           PelBuf * tmp = new PelBuf;
           tmp->buf = tbuf;
           tmp->stride = m_iSourceWidth;
           tmp->width = m_iSourceWidth;
-          tmp->height = m_iSourceHeight;       
+          tmp->height = m_iSourceHeight;
           tmp->copyFrom(m_orgPic->bufs[0]);
           pa.pre_ana_buf.push_back(tmp);
         }
 
         if (pa.CUSATD.size() < m_cEncLib.m_iPOCLast + 2 + fidx)
         {
-          pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.CUSATD.back().resize(pa.TotalCTUNum);
-          int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
+          //pa.CUSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          //pa.FrameSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          //pa.CUSATD.back().resize(pa.TotalCTUNum);
+          //pa.CUXI.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          //pa.FrameXI.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+          //pa.CUXI.back().resize(pa.TotalCTUNum);
+          /*for (int i = 0; i < pa.TotalCTUNum; i++)
+          {
+
+            pa.CUXI.back()[i].resize(4);
+            pa.CUXI.back()[i][0] = 1;
+            pa.CUXI.back()[i][1] = 1;
+            pa.CUXI.back()[i][2] = 1;
+            pa.CUXI.back()[i][3] = 1;
+          }*/
+        }
+      }
+      pa.resetCUSATD();
+      pa.resetCUXI();
+      //printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
+
+      //pa.CUXI.clear();
+
+      for (int fidx = num_pre_ana - 1; fidx >= 0; fidx--)
+      {
+        int curPOC = m_cEncLib.m_iPOCLast + 1 + fidx;
 
 
-          int rplidx = CalRPLIdxLD(curPOC);
-          //printf("rplidx:%d\n", rplidx);
+        int rplidx = CalRPLIdxLD(curPOC);
+        //printf("rplidx:%d\n", rplidx);
 
-          //if (curPOC != 0)
-          //{
-          //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
-          //}
+        //if (curPOC != 0)
+        //{
+        //  auto dInter = pa.CalInterSATD(curPOC, 0, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+        //}
 #if wang2018frame
-          pa.ifc.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.iskey.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.avgSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          int curidx = m_cEncLib.m_iPOCLast + 1 + fidx;
-          pa.setKey(curidx);
-          pa.cptSATD(curidx);
+        pa.ifc.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.iskey.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.avgSATD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        int curidx = m_cEncLib.m_iPOCLast + 1 + fidx;
+        pa.setKey(curidx);
+        pa.cptSATD(curidx);
 #endif
 #if yang2019content
-          pa.cuflag.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.cuflag.back().resize(pa.TotalCTUNum);
-          pa.ctuType.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.ctuTypeNum.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.ctuTypeNum.back().resize(TOTAL);
-          pa.regionalD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.regionalD.back().resize(TOTAL+1);
-          pa.typeBAfactor.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
-          pa.typeBAfactor.back().resize(TOTAL);
-          
-          //printf("pa.cuflag:%d\n", (int)pa.cuflag.size());
-          if (curPOC == 0)
-          {
-            pa.fd.push_back(0);
-            
-          }
-          else if (curPOC <= pa.fd.size())
-          {
-            pa.fd.push_back(pa.CalFD(curPOC, m_RPLList0[rplidx], m_RPLList1[rplidx]));
-          }
-          else
-          {
-            pa.fd[curPOC] = pa.CalFD(curPOC, m_RPLList0[rplidx], m_RPLList1[rplidx]);
-          }
-          //printf("pa.fd:%d\n", (int)pa.fd.size());
+        pa.cuflag.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.cuflag.back().resize(pa.TotalCTUNum);
+        pa.ctuType.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.ctuTypeNum.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.ctuTypeNum.back().resize(TOTAL);
+        pa.regionalD.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.regionalD.back().resize(TOTAL + 1);
+        pa.typeBAfactor.resize(m_cEncLib.m_iPOCLast + 2 + fidx);
+        pa.typeBAfactor.back().resize(TOTAL);
+
+        //printf("pa.cuflag:%d\n", (int)pa.cuflag.size());
+        if (curPOC == 0)
+        {
+          pa.fd.push_back(0);
+
+        }
+        else if (curPOC <= pa.fd.size())
+        {
+          pa.fd.push_back(pa.CalFD(curPOC, m_RPLList0[rplidx], m_RPLList1[rplidx]));
+        }
+        else
+        {
+          pa.fd[curPOC] = pa.CalFD(curPOC, m_RPLList0[rplidx], m_RPLList1[rplidx]);
+        }
+        //printf("pa.fd:%d\n", (int)pa.fd.size());
 #endif
-          for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+        for (int ctuidx = 0; ctuidx < pa.TotalCTUNum; ctuidx++)
+        {
+          auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
+          auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
+          vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
+          if (curPOC != 0)
           {
 
-            vector<uint64_t> dInter = { (uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647,(uint64_t)2147483647 };
-            if (curPOC != 0)
-            {
+            dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[rplidx], m_RPLList1[rplidx], dIntra);
+          }
 
-              dInter = pa.CalInterSATD(curPOC, ctuidx, m_RPLList0[rplidx], m_RPLList1[rplidx]);
-            }
-            auto dIntra = pa.CalIntraSATD(curPOC, ctuidx);
-            auto dIBC = pa.CalIBCSATD(curPOC, ctuidx);
-            for (int cuidx = 0; cuidx < 4; cuidx++)
-            {
+          for (int cuidx = 0; cuidx < 4; cuidx++)
+          {
 
-              pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
-              //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
-              int x = 0;
-            }
+            pa.CUSATD[curPOC][ctuidx].push_back(min(dIntra[cuidx], min(dIBC[cuidx], dInter[cuidx])));
+            //printf("dIntra:%llu  dIBC:%llu  dInter:%llu  CUSATD:%llu\n", dIntra[cuidx], dIBC[cuidx], dInter[cuidx], pa.CUSATD[fidx][ctuidx][cuidx]);
             int x = 0;
           }
+          int x = 0;
         }
-        //printf("%llu,%llu\n", pa.pre_ana_buf.size(), pa.CUSATD.size());
-        
-      }
 
-      
+      }
     }
-  }
+}
   ///// AI
   else if (m_iIntraPeriod == 1)
   {

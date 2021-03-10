@@ -215,7 +215,9 @@ public:
   int  getTargetBitInGOP( int i ) { return m_picTargetBitInGOP[i]; }
   double getMinEstLambda()        { return m_minEstLambda; }
   double getMaxEstLambda()        { return m_maxEstLambda; }
-
+#if keepGOPlambdaratio
+  double* m_lambdaratio;
+#endif
 private:
   EncRCSeq* m_encRCSeq;
   int* m_picTargetBitInGOP;

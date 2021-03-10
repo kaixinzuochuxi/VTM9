@@ -2936,6 +2936,34 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
     
       extern usingpipe pipefl;
       pipefl.GOPid = iGOPid;
+      pipefl.gop_Rleft_ratio = double(m_pcRateCtrl->getRCGOP()->getBitsLeft()) / m_pcRateCtrl->getRCGOP()->getTargetBits();
+      pipefl.gop_frame_left = m_pcRateCtrl->getRCGOP()->getPicLeft();
+      pipefl.cur_buf_ratio = double(m_pcRateCtrl->m_encBufState) / m_pcRateCtrl->getRCSeq()->getTargetRate();
+      pipefl.frames_in_buf = int(m_pcRateCtrl->m_framesInBuf.size());
+      pipefl.level = pcSlice->getTLayer();
+      pipefl.gop_avg_bpp = double(m_pcRateCtrl->getRCGOP()->getBitsLeft()) / m_pcRateCtrl->getRCGOP()->getPicLeft()/ m_pcRateCtrl->getRCSeq()->getPicHeight()/ m_pcRateCtrl->getRCSeq()->getPicWidth();
+      
+#if pre_ana
+      extern pre_analysis pa;
+      pipefl.c_frame_satd = double(pa.FrameSATD[pcSlice->getPic()->getPOC()])/ pa.frameh/pa.framew;
+#endif
+      
+      // deside xi
+      if (m_pcEncLib->getIntraPeriod() == 1)
+      {
+        pipefl.xi = 1;
+      }
+      else if (m_pcEncLib->getIntraPeriod() == -1)
+      {
+        double minratio = *min_element(m_pcRateCtrl->getRCSeq()->getBitRatio(), m_pcRateCtrl->getRCSeq()->getBitRatio() + m_iGopSize);
+        pipefl.xi = m_pcRateCtrl->getRCSeq()->getBitRatio()[iGOPid]/ minratio;
+      }
+      else
+      {
+        double minratio = *min_element(m_pcRateCtrl->getRCSeq()->getBitRatio(), m_pcRateCtrl->getRCSeq()->getBitRatio() + m_iGopSize);
+        pipefl.xi = m_pcRateCtrl->getRCSeq()->getBitRatio()[iGOPid]/ minratio;
+      }
+
       //if (pcSlice->getPic()->getPOC() == 0)
       {
         
@@ -2950,6 +2978,7 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
       }
 #endif
 #endif
+     
     if( encPic )
     // now compress (trial encode) the various slice segments (slices, and dependent slices)
     {
@@ -3680,6 +3709,17 @@ void EncGOP::compressGOP( int iPOCLast, int iNumPicRcvd, PicList& rcListPic,
         double b = 10000 / (pow(pipefl.lastmse - pipefl.refmse, 2) + 0.1);
         double c = 10000000000 / (pow(pipefl.sumbits - double(m_pcRateCtrl->getRCSeq()->getAverageBits())*(pcSlice->getPic()->getPOC() + 1), 2)+0.1);
         pipefl.reward = a * b*c;
+#elif REWARD==2
+        pipefl.reward = -pipefl.lastmse - pipefl.lastLambda*pipefl.xi*pipefl.lastbpp;
+#elif REWARD==21
+        pipefl.reward = -pipefl.lastmse - pipefl.lastLambda*pipefl.xi*pipefl.lastbpp- 
+          pipefl.lastLambda*abs(double(m_pcRateCtrl->m_encBufState)) / m_pcRateCtrl->getRCSeq()->getPicWidth() / m_pcRateCtrl->getRCSeq()->getPicHeight();
+#elif REWARD==22
+        pipefl.reward = pipefl.lastbpp*(-pipefl.lastmse - pipefl.lastLambda*pipefl.xi*pipefl.lastbpp -
+          pipefl.lastLambda*abs(double(m_pcRateCtrl->m_encBufState)) / m_pcRateCtrl->getRCSeq()->getPicWidth() / m_pcRateCtrl->getRCSeq()->getPicHeight());
+
+#elif REWARD==3
+        pipefl.reward = pipefl.lastpsnr / pipefl.lastbpp;
 #endif
 #endif
         
@@ -5885,7 +5925,18 @@ void EncGOP::write_state_and_reward(int done)
     printf("%.2f ", pipefl.state_and_reward[j]);
   printf("\n");
 #elif STATE==1
-
+  pipefl.state_and_reward.resize(8);
+  pipefl.state_and_reward[0] = pipefl.seq_avg_bpp;
+  pipefl.state_and_reward[1] = pipefl.sw_avg_bpp;
+  pipefl.state_and_reward[2] = pipefl.gop_avg_bpp;
+  pipefl.state_and_reward[3] = pipefl.cur_buf_ratio;
+  pipefl.state_and_reward[4] = pipefl.xi;
+  pipefl.state_and_reward[5] = pipefl.c_frame_satd;
+  pipefl.state_and_reward[6] = pipefl.reward;
+  pipefl.state_and_reward[7] = done;
+  for (int j = 0; j < 8; j++)
+    printf("%.2f ", pipefl.state_and_reward[j]);
+  printf("\n");
 #endif
   //if (pcSlice->getPic()->getPOC() > getGOPSize())
   //if (pcSlice->getPic()->getPOC() > 0)
